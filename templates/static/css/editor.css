@@ -43,6 +43,10 @@
     flex: 1 1 300px;
     width: 100%;
     min-width: 0;
+    min-height: 100%;
+    border-left: 1px solid var(--border);
+    margin-top: -5px;
+    padding-top: 0.5rem;
 }
 
 .sign-text {
@@ -56,8 +60,7 @@
 }
 
 .tab-pages {
-    border-top: 1px solid var(--border, #2c2c33);
-    padding-top: 0.5rem;
+    padding-left: 0.5rem;
 }
 
 .tab-page {
@@ -102,11 +105,20 @@
     color: #46c46a;
 }
 
-/* Program tab: picker bar, destination list, add form. Flat, no cards. */
+/* Program tab: 50/50 two-column layout, stacking on mobile. Flat, no cards. */
 .program {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    align-items: start;
+}
+
+.prog-details,
+.prog-content {
     display: flex;
     flex-direction: column;
     gap: 1rem;
+    min-width: 0;
 }
 
 .prog-bar {
@@ -185,7 +197,6 @@
 }
 
 .page-list button {
-    min-height: 44px;
     padding: 0.4rem 0.8rem;
     background: transparent;
     color: var(--text, #f2f2f4);
@@ -193,6 +204,8 @@
     border-radius: 8px;
     cursor: pointer;
     font: inherit;
+    width: 100%;
+    margin-bottom: 10px;
 }
 
 .page-list button:hover {
@@ -204,6 +217,63 @@
     border-color: var(--accent, #db9600);
     color: var(--accent-text, #141414);
     font-weight: 600;
+}
+
+/* One page per row: label takes the row, X pinned at the end. */
+.page-chip {
+    display: flex;
+    width: 100%;
+}
+
+.page-chip button {
+    width: auto;
+    margin-bottom: 0;
+}
+
+.page-chip button:first-child {
+    flex: 1;
+    min-width: 0;
+    text-align: left;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.page-chip button + button {
+    flex-shrink: 0;
+    margin-left: -1px;
+    border-radius: 0;
+    padding-left: 0.8rem;
+    padding-right: 0.8rem;
+}
+
+.page-chip button:last-child {
+    border-top-right-radius: 8px;
+    border-bottom-right-radius: 8px;
+}
+
+.page-chip [data-action="delete-page"] {
+    color: var(--danger, #e5484d);
+}
+
+.paste-btn {
+    margin-left: auto;
+    flex-shrink: 0;
+    background: transparent;
+    border: 1px solid var(--accent, #db9600);
+    color: var(--accent, #db9600);
+    border-radius: 8px;
+    padding: 0.3rem 0.7rem;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.paste-btn:hover {
+    background: rgba(219, 150, 0, 0.12);
 }
 
 .add-service h3 {
@@ -221,11 +291,17 @@
 
 .add-grid label {
     margin: 0;
+    width: ;
+}
+
+#service-list {
+  max-height: 70vh;
+  overflow: scroll;
 }
 
 #page-link p {
-    color: var(--muted, #a7a7b3);
-    font-size: 0.9rem;
+    margin: 0;
+    width: 100%;
 }
 
 #page-link .btn-primary {
@@ -237,10 +313,152 @@
     font-size: 0.85rem;
 }
 
+#pages-list {
+  margin-bottom: 10px;
+}
+
 @media (max-width: 700px) {
+    .program {
+        grid-template-columns: 1fr;
+    }
+
     .add-grid {
         grid-template-columns: 1fr;
     }
+}
+
+/* BDF font editor. Flat, no cards. */
+.bdf-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.75rem;
+}
+
+.bdf-pick {
+    flex: 1 1 160px;
+    margin: 0;
+}
+
+.bdf-status {
+    flex: 1 1 auto;
+    color: var(--muted, #a7a7b3);
+    font-size: 0.85rem;
+    padding-bottom: 0.6rem;
+}
+
+.bdf-cols {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) minmax(280px, 1.1fr);
+    gap: 1.5rem;
+    align-items: start;
+    margin-top: 1rem;
+}
+
+.bdf-map {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(46px, 1fr));
+    gap: 0.3rem;
+    max-height: 62vh;
+    overflow-y: auto;
+    align-content: start;
+}
+
+.bdf-map .cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 4px 2px;
+    background: transparent;
+    border: 1px solid var(--border, #2c2c33);
+    border-radius: 8px;
+    cursor: pointer;
+    font: inherit;
+    min-height: 44px;
+}
+
+.bdf-map .cell:hover {
+    border-color: var(--accent, #db9600);
+}
+
+.bdf-map .cell.active {
+    background: var(--accent, #db9600);
+    border-color: var(--accent, #db9600);
+}
+
+.bdf-map .cell.active span {
+    color: var(--accent-text, #141414);
+}
+
+.bdf-map .cell canvas {
+    width: 100%;
+    height: auto;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    background: #000;
+    border-radius: 4px;
+}
+
+.bdf-map .cell span {
+    font-size: 0.7rem;
+    color: var(--muted, #a7a7b3);
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.bdf-edit h3 {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+.bdf-meta {
+    color: var(--muted, #a7a7b3);
+    font-size: 0.85rem;
+    margin: 0.25rem 0 0.6rem;
+}
+
+#bdf-canvas {
+    border: 1px solid var(--border, #2c2c33);
+    border-radius: 8px;
+    cursor: crosshair;
+    max-width: 100%;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    touch-action: none;
+}
+
+.bdf-tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin: 0.6rem 0;
+}
+
+.bdf-tools button {
+    min-height: 44px;
+    padding: 0.4rem 0.8rem;
+    background: transparent;
+    color: var(--text, #f2f2f4);
+    border: 1px solid var(--border, #2c2c33);
+    border-radius: 8px;
+    cursor: pointer;
+    font: inherit;
+}
+
+.bdf-tools button:hover {
+    border-color: var(--accent, #db9600);
+}
+
+#bdf-strip {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 6 / 1;
+    border: 1px solid var(--border, #2c2c33);
+    border-radius: 8px;
+    margin-top: 0.4rem;
 }
 
 /* Mobile: preview on top, controls below, everything full width. */
@@ -257,5 +475,13 @@
 
     .display-wrap {
         position: static;
+    }
+
+    .bdf-cols {
+        grid-template-columns: 1fr;
+    }
+
+    .bdf-map {
+        max-height: 40vh;
     }
 }

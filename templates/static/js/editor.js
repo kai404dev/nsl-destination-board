@@ -372,7 +372,9 @@
             from_X: s.box.x,
             to_X: s.box.x + s.box.w,
             front_Y: s.box.y,
-            to_Y: s.box.y + s.box.h
+            to_Y: s.box.y + s.box.h,
+            align: s.align || 'center',
+            valign: s.valign || 'middle'
         };
     }
 
@@ -410,8 +412,17 @@
                 return response.json();
             })
             .then(function (prog) {
-                var dest = prog.services && prog.services[ctx.service] && prog.services[ctx.service][ctx.destination];
-                if (!dest || !dest.text || !dest.text[ctx.page]) throw new Error('page no longer exists');
+                // Upsert: create any missing level instead of failing.
+                if (!prog.services || typeof prog.services !== 'object') prog.services = {};
+                if (!prog.services[ctx.service] || typeof prog.services[ctx.service] !== 'object') {
+                    prog.services[ctx.service] = {};
+                }
+                var services = prog.services[ctx.service];
+                if (!services[ctx.destination] || typeof services[ctx.destination] !== 'object') {
+                    services[ctx.destination] = { service_code: '', service_name: ctx.destination };
+                }
+                var dest = services[ctx.destination];
+                if (!dest.text || typeof dest.text !== 'object') dest.text = {};
                 dest.text[ctx.page] = {
                     number: pageElement(state.route, state.styles.number),
                     destination: pageElement(state.destination, state.styles.destination),
@@ -423,10 +434,22 @@
                     body: JSON.stringify(prog)
                 }).then(function (put) {
                     if (!put.ok) throw new Error('HTTP ' + put.status);
-                    return put.json();
+                    return prog;
                 });
             })
-            .then(function () {
+            .then(function (prog) {
+                // Keep the Program tab's unsaved working copy in sync.
+                try {
+                    var raw = localStorage.getItem('nsl.programDraft.' + ctx.program);
+                    if (raw) {
+                        var working = JSON.parse(raw);
+                        if (!working.services) working.services = {};
+                        if (!working.services[ctx.service]) working.services[ctx.service] = {};
+                        working.services[ctx.service][ctx.destination] =
+                            prog.services[ctx.service][ctx.destination];
+                        localStorage.setItem('nsl.programDraft.' + ctx.program, JSON.stringify(working));
+                    }
+                } catch (err) { /* ignore */ }
                 say('Page updated ' + fmtTime(Date.now()));
             })
             .catch(function (err) {
@@ -442,14 +465,6 @@
         return String(s == null ? '' : s).replace(/[&<>"']/g, function (ch) {
             return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
         });
-    }
-
-    function blankPageElements() {
-        return {
-            number: { text: '', font: 'johnston100-45', colour: '#db9600', from_X: 210, to_X: 240, front_Y: 0, to_Y: 40 },
-            destination: { text: '', font: 'johnston100-33', colour: '#db9600', from_X: 0, to_X: 220, front_Y: 0, to_Y: 26 },
-            via: { text: '', font: 'johnston100-20', colour: '#db9600', from_X: 0, to_X: 220, front_Y: 26, to_Y: 40 }
-        };
     }
 
     function nextPageKey(text) {
@@ -479,6 +494,10 @@
         via: { x: 0, y: 26, w: 220, h: 14 }
     };
 
+    function oneOf(v, allowed, fallback) {
+        return allowed.indexOf(v) >= 0 ? v : fallback;
+    }
+
     function styleFromPage(el, fb) {
         el = el || {};
         var split = splitFontName(el.font);
@@ -489,7 +508,8 @@
         return {
             font: split.name, size: split.size,
             color: el.colour || '#db9600',
-            align: 'center', valign: 'middle',
+            align: oneOf(el.align, ['left', 'center', 'right'], 'center'),
+            valign: oneOf(el.valign, ['top', 'middle', 'bottom'], 'middle'),
             box: {
                 x: Math.max(0, Math.min(239, x)),
                 y: Math.max(0, Math.min(39, y)),
@@ -566,12 +586,20 @@
                     return;
                 }
                 var html = '<div class="page-list">';
-                keys.forEach(function (key) {
+                keys.forEach(function (key, idx) {
                     var d = ((dest.text[key] || {}).destination || {}).text || '';
                     var current = key === ctx.page;
-                    html += '<button type="button" data-page="' + esc(key) + '"' +
+                    html += '<span class="page-chip"><button type="button" data-page="' + esc(key) + '"' +
                         (current ? ' class="active" disabled' : '') + '>' +
-                        esc(key + (d ? ' ' + d : '')) + '</button>';
+                        esc(key + (d ? ' ' + d : '')) + '</button>' +
+                        '<button type="button" data-shift-page="' + esc(key) + '" data-dir="-1"' +
+                        (idx === 0 ? ' disabled' : '') +
+                        ' aria-label="Move page ' + esc(key) + ' earlier">◀</button>' +
+                        '<button type="button" data-shift-page="' + esc(key) + '" data-dir="1"' +
+                        (idx === keys.length - 1 ? ' disabled' : '') +
+                        ' aria-label="Move page ' + esc(key) + ' later">▶</button>' +
+                        '<button type="button" data-delete-page="' + esc(key) +
+                        '" aria-label="Delete page ' + esc(key) + '">×</button></span>';
                 });
                 list.innerHTML = html + '</div>';
             })
@@ -616,17 +644,122 @@
             });
     }
 
+    function shiftLinkedPage(root, pageKey, dir) {
+        var ctx = loadCtx();
+        if (!ctx || !ctx.program) return;
+        setStatus(root, 'Reordering…');
+        fetchProgram(ctx.program)
+            .then(function (prog) {
+                var dest = linkedDestination(prog, ctx);
+                if (!dest || !dest.text[pageKey]) throw new Error('page no longer exists');
+                var keys = sortedPageKeys(dest.text);
+                var i = keys.indexOf(pageKey);
+                var j = i + dir;
+                if (i < 0 || j < 0 || j >= keys.length) throw new Error('at end');
+                var tmp = dest.text[keys[i]];
+                dest.text[keys[i]] = dest.text[keys[j]];
+                dest.text[keys[j]] = tmp;
+                return fetch('/api/programs/' + encodeURIComponent(ctx.program), {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(prog)
+                }).then(function (put) {
+                    if (!put.ok) throw new Error('HTTP ' + put.status);
+                    return prog;
+                });
+            })
+            .then(function (prog) {
+                // Keep the Program tab's unsaved working copy in sync.
+                try {
+                    var raw = localStorage.getItem('nsl.programDraft.' + ctx.program);
+                    if (raw) {
+                        var working = JSON.parse(raw);
+                        var dest = working.services && working.services[ctx.service] &&
+                            working.services[ctx.service][ctx.destination];
+                        if (dest) {
+                            dest.text = prog.services[ctx.service][ctx.destination].text;
+                            localStorage.setItem('nsl.programDraft.' + ctx.program, JSON.stringify(working));
+                        }
+                    }
+                } catch (err) { /* ignore */ }
+                // The current draft now shows the neighbour's content (keys are
+                // stable, contents swapped) - reload the same key so the
+                // editor + preview match the new rotation.
+                return loadLinkedPage(root, ctx.page);
+            })
+            .catch(function (err) {
+                console.error(err);
+                if (err.message !== 'at end') setStatus(root, 'Could not reorder page');
+            });
+    }
+
+    function deleteLinkedPage(root, pageKey) {
+        var ctx = loadCtx();
+        if (!ctx || !ctx.program) return;
+        if (!window.confirm('Delete page ' + pageKey + ' of ' + ctx.destination + '?')) return;
+        setStatus(root, 'Deleting page…');
+        fetchProgram(ctx.program)
+            .then(function (prog) {
+                var dest = linkedDestination(prog, ctx);
+                if (!dest || !dest.text[pageKey]) throw new Error('page no longer exists');
+                if (Object.keys(dest.text).length <= 1) throw new Error('last page');
+                delete dest.text[pageKey];
+                return fetch('/api/programs/' + encodeURIComponent(ctx.program), {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(prog)
+                }).then(function (put) {
+                    if (!put.ok) throw new Error('HTTP ' + put.status);
+                    return prog;
+                });
+            })
+            .then(function (prog) {
+                // Keep the Program tab's unsaved working copy in sync.
+                try {
+                    var raw = localStorage.getItem('nsl.programDraft.' + ctx.program);
+                    if (raw) {
+                        var working = JSON.parse(raw);
+                        var dest = working.services && working.services[ctx.service] &&
+                            working.services[ctx.service][ctx.destination];
+                        if (dest) {
+                            dest.text = prog.services[ctx.service][ctx.destination].text;
+                            localStorage.setItem('nsl.programDraft.' + ctx.program, JSON.stringify(working));
+                        }
+                    }
+                } catch (err) { /* ignore */ }
+                if (ctx.page === pageKey) {
+                    var remaining = sortedPageKeys(prog.services[ctx.service][ctx.destination].text);
+                    return loadLinkedPage(root, remaining[0]);
+                }
+                renderPages(root);
+            })
+            .catch(function (err) {
+                console.error(err);
+                setStatus(root, err.message === 'last page'
+                    ? 'A destination needs at least one page'
+                    : 'Could not delete page');
+            });
+    }
+
     function addLinkedPage(root) {
         var ctx = loadCtx();
         if (!ctx || !ctx.program) return;
         setStatus(root, 'Adding page…');
+        // The new page inherits the current draft's route, destination and
+        // styling - only the new content (usually the via) needs typing.
+        var state = collectState(root);
+        var inherited = {
+            number: pageElement(state.route, state.styles.number),
+            destination: pageElement(state.destination, state.styles.destination),
+            via: pageElement('', state.styles.via)
+        };
         var freshText = null;
         fetchProgram(ctx.program)
             .then(function (prog) {
                 var dest = linkedDestination(prog, ctx);
                 if (!dest) throw new Error('destination no longer exists');
                 var key = nextPageKey(dest.text);
-                dest.text[key] = blankPageElements();
+                dest.text[key] = inherited;
                 freshText = dest.text;
                 return fetch('/api/programs/' + encodeURIComponent(ctx.program), {
                     method: 'PUT',
@@ -775,9 +908,20 @@
                 doClear(root);
                 return;
             }
+            var shiftPageBtn = event.target.closest ? event.target.closest('#pages-list [data-shift-page]') : null;
+            if (shiftPageBtn && !shiftPageBtn.disabled) {
+                var dir = parseInt(shiftPageBtn.dataset.dir, 10);
+                shiftLinkedPage(root, shiftPageBtn.dataset.shiftPage, isNaN(dir) ? 0 : dir);
+                return;
+            }
             var pageBtn = event.target.closest ? event.target.closest('#pages-list [data-page]') : null;
             if (pageBtn && !pageBtn.disabled) {
                 loadLinkedPage(root, pageBtn.dataset.page);
+                return;
+            }
+            var delPageBtn = event.target.closest ? event.target.closest('#pages-list [data-delete-page]') : null;
+            if (delPageBtn) {
+                deleteLinkedPage(root, delPageBtn.dataset.deletePage);
                 return;
             }
             var addPageBtn = event.target.closest ? event.target.closest('#add-page') : null;

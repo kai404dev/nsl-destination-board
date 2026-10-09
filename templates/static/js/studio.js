@@ -5,7 +5,8 @@
 (function () {
     var VIEWS = {
         editor: '/templates/pages/editor.html',
-        program: '/templates/pages/program.html'
+        program: '/templates/pages/program.html',
+        fonts: '/templates/pages/fonts.html'
     };
 
     var tabsEl = document.getElementById('studio-tabs');
@@ -32,6 +33,7 @@
                 // then tabs picks up the restored `.active` buttons.
                 if (window.NSLEditor) window.NSLEditor.init(contentEl);
                 if (window.NSLProgram) window.NSLProgram.init(contentEl);
+                if (window.NSLFonts) window.NSLFonts.init(contentEl);
                 if (window.NSLTabs) window.NSLTabs.init(contentEl);
             })
             .catch(function (err) {

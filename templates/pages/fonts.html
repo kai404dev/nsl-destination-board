@@ -1,0 +1,36 @@
+<div class="bdf" id="bdf-root">
+    <div class="bdf-bar">
+        <label class="bdf-pick">Font
+            <select id="bdf-font">
+                <option>Loading…</option>
+            </select>
+        </label>
+        <label class="bdf-pick">Size
+            <select id="bdf-size">
+                <option>Loading…</option>
+            </select>
+        </label>
+        <span class="bdf-status" id="bdf-status"></span>
+        <button id="bdf-save" class="btn-primary" type="button">Save glyph</button>
+    </div>
+    <div class="bdf-cols">
+        <div class="bdf-map" id="bdf-map"></div>
+        <div class="bdf-edit">
+            <h3 id="bdf-glyph-name">–</h3>
+            <div class="bdf-meta" id="bdf-meta"></div>
+            <canvas id="bdf-canvas"></canvas>
+            <div class="bdf-tools">
+                <button type="button" data-tool="left" aria-label="Shift left">←</button>
+                <button type="button" data-tool="right" aria-label="Shift right">→</button>
+                <button type="button" data-tool="up" aria-label="Shift up">↑</button>
+                <button type="button" data-tool="down" aria-label="Shift down">↓</button>
+                <button type="button" data-tool="invert">Invert</button>
+                <button type="button" data-tool="clear">Clear</button>
+            </div>
+            <label>Test
+                <input type="text" id="bdf-test" value="Tutbury 101">
+            </label>
+            <canvas id="bdf-strip" width="240" height="40"></canvas>
+        </div>
+    </div>
+</div>

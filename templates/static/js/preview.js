@@ -113,21 +113,13 @@
         return { width: width, top: top, bottom: bottom };
     }
 
-    function drawString(ctx, font, str, box, align, valign, color) {
-        if (!str) return 0;
-        var m = measureString(font, str);
-        var x = box.x;
-        if (align === 'center') x = Math.round(box.x + (box.w - m.width) / 2);
-        else if (align === 'right') x = Math.round(box.x + box.w - m.width);
-        var baseline = Math.round(box.y + box.h + m.bottom);
-        if (valign === 'top') baseline = Math.round(box.y + m.top);
-        else if (valign === 'middle') baseline = Math.round(box.y + box.h / 2 + (m.top + m.bottom) / 2);
+    function drawLine(ctx, font, line, x, baseline, color) {
         ctx.fillStyle = color;
         var pen = x;
-        for (var i = 0; i < str.length; i++) {
-            var glyph = font.glyphs[str.charCodeAt(i)];
+        for (var i = 0; i < line.length; i++) {
+            var glyph = font.glyphs[line.charCodeAt(i)];
             if (!glyph) {
-                pen += 4;
+                pen += 4; // missing glyph: fixed advance, like a space
                 continue;
             }
             var stride = Math.ceil(glyph.w / 8);
@@ -145,6 +137,58 @@
         return pen - x;
     }
 
+    function drawString(ctx, font, str, box, align, valign, color) {
+        if (!str) return 0;
+        var lines = String(str).split(/\r?\n/);
+        if (lines.length <= 1) {
+            var m = measureString(font, str);
+            var x = box.x;
+            if (align === 'center') x = Math.round(box.x + (box.w - m.width) / 2);
+            else if (align === 'right') x = Math.round(box.x + box.w - m.width);
+            var baseline = Math.round(box.y + box.h + m.bottom);
+            if (valign === 'top') baseline = Math.round(box.y + m.top);
+            else if (valign === 'middle') baseline = Math.round(box.y + box.h / 2 + (m.top + m.bottom) / 2);
+            return drawLine(ctx, font, str, x, baseline, color);
+        }
+        // Multi-line: stack lines using font ascent/descent so Enter in the
+        // Via box (or "\n" in a .dest file) renders as separate rows.
+        var measures = lines.map(function (line) {
+            return measureString(font, line);
+        });
+        var ascent = font.ascent || 0;
+        var descent = font.descent || 0;
+        var lineHeight = ascent + descent;
+        if (!lineHeight) {
+            var maxInk = 0;
+            measures.forEach(function (mm) {
+                var ink = mm.top - mm.bottom;
+                if (ink > maxInk) maxInk = ink;
+            });
+            lineHeight = maxInk || 8;
+            if (!ascent) {
+                var maxTop = 0;
+                measures.forEach(function (mm) {
+                    if (mm.top > maxTop) maxTop = mm.top;
+                });
+                ascent = maxTop || lineHeight;
+            }
+        }
+        var totalH = lineHeight * lines.length;
+        var startY = Math.round(box.y + box.h - totalH); // bottom (default)
+        if (valign === 'top') startY = Math.round(box.y);
+        else if (valign === 'middle') startY = Math.round(box.y + (box.h - totalH) / 2);
+        var maxWidth = 0;
+        lines.forEach(function (line, i) {
+            var w = measures[i].width;
+            if (w > maxWidth) maxWidth = w;
+            var lx = box.x;
+            if (align === 'center') lx = Math.round(box.x + (box.w - w) / 2);
+            else if (align === 'right') lx = Math.round(box.x + box.w - w);
+            drawLine(ctx, font, line, lx, startY + ascent + i * lineHeight, color);
+        });
+        return maxWidth;
+    }
+
     function drawRegion(ctx, font, text, box, align, valign, color) {
         ctx.save();
         ctx.beginPath();
@@ -154,13 +198,23 @@
             drawString(ctx, font, text, box, align || 'left', valign || 'bottom', color);
         } else if (text) {
             // BDF unavailable: monospace fallback, same box + alignment.
+            // Supports "\n" by splitting into rows within the box.
+            var fallbackLines = String(text).split(/\r?\n/);
             ctx.fillStyle = color;
-            ctx.font = Math.max(6, box.h - 4) + 'px monospace';
+            ctx.font = Math.max(6, Math.floor(box.h / fallbackLines.length) - 2) + 'px monospace';
             ctx.textAlign = align === 'center' ? 'center' : align === 'right' ? 'right' : 'left';
-            ctx.textBaseline = valign === 'top' ? 'top' : valign === 'middle' ? 'middle' : 'bottom';
             var fx = align === 'center' ? box.x + box.w / 2 : align === 'right' ? box.x + box.w - 1 : box.x + 1;
-            var fy = valign === 'top' ? box.y : valign === 'middle' ? box.y + box.h / 2 : box.y + box.h - 1;
-            ctx.fillText(text, fx, fy);
+            if (fallbackLines.length <= 1) {
+                ctx.textBaseline = valign === 'top' ? 'top' : valign === 'middle' ? 'middle' : 'bottom';
+                var fy = valign === 'top' ? box.y : valign === 'middle' ? box.y + box.h / 2 : box.y + box.h - 1;
+                ctx.fillText(fallbackLines[0], fx, fy);
+            } else {
+                ctx.textBaseline = 'middle';
+                var slice = box.h / fallbackLines.length;
+                fallbackLines.forEach(function (line, i) {
+                    ctx.fillText(line, fx, box.y + slice * (i + 0.5));
+                });
+            }
         }
         ctx.restore();
     }

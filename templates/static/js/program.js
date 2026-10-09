@@ -30,9 +30,9 @@
 
     function blankElements() {
         return {
-            number: { text: '', font: 'johnston100-45', colour: '#db9600', from_X: 210, to_X: 240, front_Y: 0, to_Y: 40 },
-            destination: { text: '', font: 'johnston100-33', colour: '#db9600', from_X: 0, to_X: 220, front_Y: 0, to_Y: 26 },
-            via: { text: '', font: 'johnston100-20', colour: '#db9600', from_X: 0, to_X: 220, front_Y: 26, to_Y: 40 }
+            number: { text: '', font: 'johnston100-45', colour: '#db9600', from_X: 210, to_X: 240, front_Y: 0, to_Y: 40, align: 'center', valign: 'middle' },
+            destination: { text: '', font: 'johnston100-33', colour: '#db9600', from_X: 0, to_X: 220, front_Y: 0, to_Y: 26, align: 'center', valign: 'middle' },
+            via: { text: '', font: 'johnston100-20', colour: '#db9600', from_X: 0, to_X: 220, front_Y: 26, to_Y: 40, align: 'center', valign: 'middle' }
         };
     }
 
@@ -47,6 +47,29 @@
 
     function sortedKeys(obj) {
         return Object.keys(obj || {}).sort(function (a, b) {
+            return a.localeCompare(b, undefined, { numeric: true });
+        });
+    }
+
+    // Destinations order by service code (numeric codes first, numerically),
+    // falling back to name. Services keep key order.
+    function sortedDestinations(services, service) {
+        var group = services[service] || {};
+        return Object.keys(group).sort(function (a, b) {
+            var ca = ((group[a] || {}).service_code || '').trim();
+            var cb = ((group[b] || {}).service_code || '').trim();
+            var na = /^\d+$/.test(ca);
+            var nb = /^\d+$/.test(cb);
+            if (na && nb) {
+                var diff = parseInt(ca, 10) - parseInt(cb, 10);
+                if (diff) return diff;
+            } else if (na) {
+                return -1;
+            } else if (nb) {
+                return 1;
+            } else if (ca !== cb) {
+                return ca.localeCompare(cb);
+            }
             return a.localeCompare(b, undefined, { numeric: true });
         });
     }
@@ -86,6 +109,9 @@
     // Module state for the currently open program.
     var S = { name: '', data: null, dirty: false, lastSaved: 0 };
 
+    // Copy/move clipboard: { mode: 'copy'|'move', snapshot, label, from: { program, service, destination, page } }.
+    var clipboard = null;
+
     function storeGet(key) {
         try {
             return localStorage.getItem(key);
@@ -111,6 +137,27 @@
         if (el) el.textContent = text;
     }
 
+    function nextServiceCode() {
+        var max = null;
+        Object.keys(S.data && S.data.services || {}).forEach(function (service) {
+            Object.keys(S.data.services[service] || {}).forEach(function (name) {
+                var code = (S.data.services[service][name].service_code || '').trim();
+                if (/^\d+$/.test(code)) {
+                    var n = parseInt(code, 10);
+                    if (max === null || n > max) max = n;
+                }
+            });
+        });
+        return max === null ? '' : String(max + 1);
+    }
+
+    function suggestCode(root) {
+        var el = $(root, 'new-code');
+        if (el && !el.value.trim()) {
+            el.value = nextServiceCode();
+        }
+    }
+
     function persist(root) {
         S.dirty = true;
         if (S.name && S.data) storeSet(draftKey(S.name), JSON.stringify(S.data));
@@ -124,24 +171,50 @@
 
     function render(root) {
         var list = $(root, 'service-list');
-        if (!list || !S.data) return;
+        if (!list) return;
+        if (!S.data) {
+            list.innerHTML = '<p class="muted">No programs yet - create one above.</p>';
+            return;
+        }
         var services = S.data.services || {};
         var html = '';
         sortedKeys(services).forEach(function (service) {
             html += '<h3 class="service-key">Service ' + esc(service) + '</h3>';
-            sortedKeys(services[service]).forEach(function (name) {
+            sortedDestinations(services, service).forEach(function (name) {
                 var destination = services[service][name] || {};
                 html += '<div class="service"><div class="service-head"><strong>' + esc(name) + '</strong>' +
-                    '<span class="code">' + esc(destination.service_code || '') + '</span></div><div class="page-list">';
+                    '<span class="code">' + esc(destination.service_code || '') + '</span>';
+                if (clipboard) {
+                    html += '<button type="button" class="paste-btn" data-action="paste-page" data-service="' + esc(service) +
+                        '" data-destination="' + esc(name) + '">Paste here</button>';
+                }
+                html += '</div><div class="page-list">';
                 var pages = servicePages(destination);
                 if (pages) {
-                    sortedKeys(pages).forEach(function (pageKey) {
+                    sortedKeys(pages).forEach(function (pageKey, idx, arr) {
                         var page = pages[pageKey] || {};
                         var dest = page.destination || {};
                         var label = pageKey + (dest.text ? ' ' + dest.text : '');
-                        html += '<button type="button" data-action="edit" data-service="' + esc(service) +
+                        html += '<span class="page-chip"><button type="button" data-action="edit" data-service="' + esc(service) +
                             '" data-destination="' + esc(name) + '" data-page="' + esc(pageKey) + '">' +
-                            esc(label) + '</button>';
+                            esc(label) + '</button>' +
+                            '<button type="button" data-action="shift-left" data-service="' + esc(service) +
+                            '" data-destination="' + esc(name) + '" data-page="' + esc(pageKey) + '"' +
+                            (idx === 0 ? ' disabled' : '') +
+                            ' aria-label="Move page ' + esc(pageKey) + ' earlier">◀</button>' +
+                            '<button type="button" data-action="shift-right" data-service="' + esc(service) +
+                            '" data-destination="' + esc(name) + '" data-page="' + esc(pageKey) + '"' +
+                            (idx === arr.length - 1 ? ' disabled' : '') +
+                            ' aria-label="Move page ' + esc(pageKey) + ' later">▶</button>' +
+                            '<button type="button" data-action="copy-page" data-service="' + esc(service) +
+                            '" data-destination="' + esc(name) + '" data-page="' + esc(pageKey) +
+                            '" aria-label="Copy page ' + esc(pageKey) + '">Copy</button>' +
+                            '<button type="button" data-action="move-page" data-service="' + esc(service) +
+                            '" data-destination="' + esc(name) + '" data-page="' + esc(pageKey) +
+                            '" aria-label="Move page ' + esc(pageKey) + '">Move</button>' +
+                            '<button type="button" data-action="delete-page" data-service="' + esc(service) +
+                            '" data-destination="' + esc(name) + '" data-page="' + esc(pageKey) +
+                            '" aria-label="Delete page ' + esc(pageKey) + '">×</button></span>';
                     });
                 } else {
                     html += '<span class="muted">Bitmap service</span>';
@@ -155,6 +228,7 @@
         });
         if (!html) html = '<p class="muted">No destinations yet.</p>';
         list.innerHTML = html;
+        suggestCode(root);
     }
 
     function fillProgramSelect(root, names) {
@@ -233,12 +307,48 @@
             });
     }
 
+    function oneOf(v, allowed, fallback) {
+        return allowed.indexOf(v) >= 0 ? v : fallback;
+    }
+
+    function carryElement(el, fb, clearText) {
+        el = el || {};
+        function n(v, fallback) {
+            var parsed = parseInt(v, 10);
+            return isNaN(parsed) ? fallback : parsed;
+        }
+        return {
+            text: clearText ? '' : (el.text || ''),
+            font: el.font || fb.font,
+            colour: el.colour || fb.colour,
+            from_X: n(el.from_X, fb.from_X),
+            to_X: n(el.to_X, fb.to_X),
+            front_Y: n(el.front_Y != null ? el.front_Y : el.from_Y, fb.front_Y),
+            to_Y: n(el.to_Y, fb.to_Y),
+            align: oneOf(el.align, ['left', 'center', 'right'], 'center'),
+            valign: oneOf(el.valign, ['top', 'middle', 'bottom'], 'middle')
+        };
+    }
+
+    // New pages inherit the last page's route, destination and styling so
+    // only the new content (usually the via) needs typing.
+    function carryPage(template) {
+        var fb = blankElements();
+        if (!template) return fb;
+        return {
+            number: carryElement(template.number, fb.number, false),
+            destination: carryElement(template.destination, fb.destination, false),
+            via: carryElement(template.via, fb.via, true)
+        };
+    }
+
     function addPage(root, service, destinationName) {
         var destination = S.data && S.data.services && S.data.services[service] && S.data.services[service][destinationName];
         var pages = servicePages(destination);
         if (!pages) return;
+        var keys = sortedKeys(pages);
         var key = nextPageKey(pages);
-        pages[key] = blankElements();
+        pages[key] = carryPage(keys.length ? pages[keys[keys.length - 1]] : null);
         persist(root);
         render(root);
     }
@@ -274,6 +384,156 @@
             });
     }
 
+    function fetchProgramFile(name) {
+        return fetch('/api/programs/' + encodeURIComponent(name)).then(function (response) {
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            return response.json();
+        });
+    }
+
+    function putProgramFile(name, data) {
+        return fetch('/api/programs/' + encodeURIComponent(name), {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        }).then(function (response) {
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            return response.json();
+        });
+    }
+
+    function deleteProgram(root) {
+        if (!S.name) return;
+        if (!window.confirm('Delete program ' + S.name + '? This cannot be undone.')) return;
+        setStatus(root, 'Deleting…');
+        fetch('/api/programs/' + encodeURIComponent(S.name), { method: 'DELETE' })
+            .then(function (response) {
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                return response.json();
+            })
+            .then(function () {
+                storeDel(draftKey(S.name));
+                S.name = '';
+                S.data = null;
+                S.dirty = false;
+                clipboard = null;
+                return refresh(root);
+            })
+            .catch(function (err) {
+                console.error(err);
+                setStatus(root, 'Could not delete program');
+            });
+    }
+
+    function grabPage(mode, root, service, destinationName, pageKey) {
+        var destination = S.data.services[service][destinationName];
+        var page = servicePages(destination)[pageKey];
+        if (!page) return;
+        var dest = (page.destination || {}).text || pageKey;
+        // Clicking the same page again clears the clipboard.
+        if (clipboard && clipboard.mode === mode &&
+            clipboard.from.program === S.name && clipboard.from.service === service &&
+            clipboard.from.destination === destinationName && clipboard.from.page === pageKey) {
+            clipboard = null;
+            setStatus(root, '');
+            render(root);
+            return;
+        }
+        clipboard = {
+            mode: mode,
+            snapshot: JSON.parse(JSON.stringify(page)),
+            label: pageKey + (dest ? ' ' + dest : ''),
+            from: { program: S.name, service: service, destination: destinationName, page: pageKey }
+        };
+        setStatus(root, (mode === 'copy' ? 'Copied ' : 'Moving ') + clipboard.label + ' — choose a destination, then Paste');
+        render(root);
+    }
+
+    function pastePage(root, service, destinationName) {
+        if (!clipboard || !S.data || !S.data.services) return;
+        var destination = S.data.services[service] && S.data.services[service][destinationName];
+        var pages = servicePages(destination);
+        if (!pages) {
+            setStatus(root, 'Cannot paste into a bitmap service');
+            return;
+        }
+        var key = nextPageKey(pages);
+        pages[key] = JSON.parse(JSON.stringify(clipboard.snapshot));
+        if (clipboard.mode === 'move' && clipboard.from.program === S.name) {
+            var src = S.data.services[clipboard.from.service] &&
+                S.data.services[clipboard.from.service][clipboard.from.destination];
+            var srcPages = servicePages(src);
+            if (!srcPages || !srcPages[clipboard.from.page] || Object.keys(srcPages).length <= 1) {
+                delete pages[key]; // roll back: cannot move the last page
+                setStatus(root, 'Cannot move the last page');
+                render(root);
+                return;
+            }
+            delete srcPages[clipboard.from.page];
+        }
+        var mode = clipboard.mode;
+        var from = clipboard.from;
+        clipboard = null;
+        persist(root);
+        render(root);
+        if (mode === 'move' && from.program !== S.name) {
+            // Source lives in another file: remove it there right away.
+            setStatus(root, 'Pasted here (unsaved) — removing from ' + from.program + '…');
+            fetchProgramFile(from.program)
+                .then(function (srcProg) {
+                    var srcDest = srcProg.services && srcProg.services[from.service] &&
+                        srcProg.services[from.service][from.destination];
+                    var srcKeys = servicePages(srcDest);
+                    if (!srcKeys || !srcKeys[from.page] || Object.keys(srcKeys).length <= 1) {
+                        throw new Error('source page unavailable');
+                    }
+                    delete srcKeys[from.page];
+                    return putProgramFile(from.program, srcProg);
+                })
+                .then(function () {
+                    storeDel(draftKey(from.program));
+                    setStatus(root, 'Moved here — Save to write this file');
+                })
+                .catch(function (err) {
+                    console.error(err);
+                    setStatus(root, 'Pasted, but source cleanup failed — Save to write this file');
+                });
+        } else {
+            setStatus(root, (mode === 'copy' ? 'Copied' : 'Moved') + ' here — Save to write the file');
+        }
+    }
+
+    function deletePage(root, service, destinationName, pageKey) {
+        var destination = S.data && S.data.services && S.data.services[service] && S.data.services[service][destinationName];
+        var pages = servicePages(destination);
+        if (!pages || !pages[pageKey]) return;
+        if (Object.keys(pages).length <= 1) {
+            setStatus(root, 'A destination needs at least one page');
+            return;
+        }
+        if (!window.confirm('Delete page ' + pageKey + ' of ' + destinationName + '?')) return;
+        delete pages[pageKey];
+        persist(root);
+        render(root);
+    }
+
+    // Reorder rotation: keys ("0:", "1:", ...) define display order, so
+    // shifting swaps the two pages' contents, keeping keys stable.
+    function shiftPage(root, service, destinationName, pageKey, dir) {
+        var destination = S.data && S.data.services && S.data.services[service] && S.data.services[service][destinationName];
+        var pages = servicePages(destination);
+        if (!pages || !pages[pageKey]) return;
+        var keys = sortedKeys(pages);
+        var i = keys.indexOf(pageKey);
+        var j = i + dir;
+        if (i < 0 || j < 0 || j >= keys.length) return;
+        var tmp = pages[keys[i]];
+        pages[keys[i]] = pages[keys[j]];
+        pages[keys[j]] = tmp;
+        persist(root);
+        render(root);
+    }
+
     function addDestination(root) {
         var serviceEl = $(root, 'new-service');
         var nameEl = $(root, 'new-destination');
@@ -288,7 +548,7 @@
             return;
         }
         S.data.services[service][name] = {
-            service_code: codeEl ? codeEl.value.trim() : '',
+            service_code: (codeEl && codeEl.value.trim()) || nextServiceCode(),
             service_name: name,
             text: { '0:': blankElements() }
         };
@@ -308,7 +568,8 @@
             return {
                 font: split.name, size: split.size,
                 color: el.colour || '#db9600',
-                align: 'center', valign: 'middle',
+                align: oneOf(el.align, ['left', 'center', 'right'], 'center'),
+                valign: oneOf(el.valign, ['top', 'middle', 'bottom'], 'middle'),
                 box: boxOf(el, fb)
             };
         }
@@ -343,6 +604,13 @@
         else if (action === 'add-program') addProgram(root);
         else if (action === 'add-page') addPage(root, btn.dataset.service, btn.dataset.destination);
         else if (action === 'add-destination') addDestination(root);
+        else if (action === 'delete-page') deletePage(root, btn.dataset.service, btn.dataset.destination, btn.dataset.page);
+        else if (action === 'shift-left') shiftPage(root, btn.dataset.service, btn.dataset.destination, btn.dataset.page, -1);
+        else if (action === 'shift-right') shiftPage(root, btn.dataset.service, btn.dataset.destination, btn.dataset.page, 1);
+        else if (action === 'delete-program') deleteProgram(root);
+        else if (action === 'copy-page') grabPage('copy', root, btn.dataset.service, btn.dataset.destination, btn.dataset.page);
+        else if (action === 'move-page') grabPage('move', root, btn.dataset.service, btn.dataset.destination, btn.dataset.page);
+        else if (action === 'paste-page') pastePage(root, btn.dataset.service, btn.dataset.destination);
         else if (action === 'edit') editPage(root, btn.dataset.service, btn.dataset.destination, btn.dataset.page);
     }
 

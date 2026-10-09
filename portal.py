@@ -18,8 +18,10 @@ Routes:
                                       (css, js, images, ...)
     /api/fonts                        -> JSON list of font names
     /api/sizes/<font-name>            -> JSON list of sizes for a font
+    /api/fonts/<name>/<size>/glyphs   -> JSON [{encoding, name}] (GET)
+                                      -> GET/PUT .../glyphs/<encoding>
     /api/programs                     -> GET list, POST {"name"} to create
-    /api/programs/<name>              -> GET/PUT one .dest program as JSON
+    /api/programs/<name>              -> GET/PUT/DELETE one .dest program
     /fonts/<path>                     -> raw BDF font files (canvas preview)
 """
 
@@ -116,6 +118,17 @@ class BoardHandler(SimpleHTTPRequestHandler):
                 return self.send_error(404, f"Unknown font: {name or '(none)'}")
             return self._serve_json(sizes)
 
+        # 6b. Glyph API for the BDF editor (GET only; PUT lives in do_PUT).
+        if url_path.startswith("/api/fonts/"):
+            glyph = self._parse_glyph_path(url_path)
+            if glyph is not None:
+                if "error" in glyph:
+                    return self._serve_json({"error": glyph["error"]}, status=glyph["status"])
+                if glyph["encoding"] is None:
+                    glyphs = api.parse_bdf_glyphs(glyph["path"])
+                    return self._serve_json([{"encoding": g["encoding"], "name": g["name"]} for g in glyphs])
+                return self._serve_glyph(glyph["path"], glyph["encoding"])
+
         # 7. Programs API: list and fetch .dest files.
         if url_path in ("/api/programs", "/api/programs/"):
             return self._serve_json(api.list_programs(PROGRAMS_DIR))
@@ -133,7 +146,6 @@ class BoardHandler(SimpleHTTPRequestHandler):
         url_path = posixpath.normpath(parsed.path or "/")
         if parsed.path.endswith("/") and url_path != "/":
             url_path += "/"
-
         # Save (overwrite) a .dest program.
         if url_path.startswith("/api/programs/"):
             name = urllib.parse.unquote(url_path[len("/api/programs/"):].strip("/"))
@@ -141,6 +153,78 @@ class BoardHandler(SimpleHTTPRequestHandler):
             if error:
                 return self._serve_json({"error": error}, status=400)
             ok, message = api.save_program(PROGRAMS_DIR, name, data)
+            if not ok:
+                status = 404 if message == "program not found" else 400
+                return self._serve_json({"error": message}, status=status)
+            return self._serve_json({"ok": True})
+
+        # Save one glyph's pixels: PUT {rows: [[0|1]]}.
+        glyph = self._parse_glyph_path(url_path)
+        if glyph is not None:
+            if "error" in glyph:
+                return self._serve_json({"error": glyph["error"]}, status=glyph["status"])
+            if glyph["encoding"] is None:
+                return self._serve_json({"error": "not found"}, status=404)
+            data, error = self._read_json_body()
+            if error:
+                return self._serve_json({"error": error}, status=400)
+            rows = data.get("rows") if isinstance(data, dict) else None
+            if not isinstance(rows, list):
+                return self._serve_json({"error": "body must be {rows: [[0|1]]}"}, status=400)
+            ok, message = api.write_bdf_glyph(glyph["path"], glyph["encoding"], rows)
+            if not ok:
+                status = 404 if message == "glyph not found" else 400
+                return self._serve_json({"error": message}, status=status)
+            return self._serve_json({"ok": True})
+
+        return self.send_error(404, f"Not found: {parsed.path}")
+
+    def _parse_glyph_path(self, url_path):
+        """Split /api/fonts/<name>/<size>/glyphs[/<enc>].
+
+        Returns None when it isn't a glyph route, {"error", "status"} on a
+        bad route, or {"path", "encoding"} (encoding None for the list).
+        """
+        if not url_path.startswith("/api/fonts/"):
+            return None
+        parts = url_path[len("/api/fonts/"):].strip("/").split("/")
+        if len(parts) < 3 or parts[2] != "glyphs" or len(parts) > 4:
+            return None
+        font_path = api.font_file(FONTS_DIR, urllib.parse.unquote(parts[0]), parts[1])
+        if font_path is None:
+            return {"error": "font not found", "status": 404}
+        if len(parts) == 3:
+            return {"path": font_path, "encoding": None}
+        try:
+            encoding = int(parts[3])
+        except ValueError:
+            return {"error": "bad encoding", "status": 400}
+        return {"path": font_path, "encoding": encoding}
+
+    def _serve_glyph(self, font_path, encoding):
+        for g in api.parse_bdf_glyphs(font_path):
+            if g["encoding"] == encoding:
+                w, h = g["bbx"][0], g["bbx"][1]
+                stride = (w + 7) // 8
+                bits = []
+                for row in g["rows"][:h]:
+                    bits.append([(row >> (stride * 8 - 1 - c)) & 1 for c in range(w)])
+                return self._serve_json({
+                    "encoding": g["encoding"], "name": g["name"],
+                    "dwidth": g["dwidth"], "bbx": g["bbx"], "rows": bits,
+                })
+        return self._serve_json({"error": "glyph not found"}, status=404)
+
+    def do_DELETE(self):  # noqa: N802 - stdlib handler name
+        parsed = urllib.parse.urlparse(self.path)
+        url_path = posixpath.normpath(parsed.path or "/")
+        if parsed.path.endswith("/") and url_path != "/":
+            url_path += "/"
+
+        # Delete a .dest program file.
+        if url_path.startswith("/api/programs/"):
+            name = urllib.parse.unquote(url_path[len("/api/programs/"):].strip("/"))
+            ok, message = api.delete_program(PROGRAMS_DIR, name)
             if not ok:
                 status = 404 if message == "program not found" else 400
                 return self._serve_json({"error": message}, status=status)

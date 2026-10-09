@@ -121,6 +121,8 @@ a {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: thin;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 5px;
 }
 
 .tab {
@@ -256,6 +258,8 @@ textarea:focus-visible {
     cursor: pointer;
     font: inherit;
     font-weight: 600;
+margin-top: 10px;
+width: 100%;
 }
 
 .btn-danger:hover {

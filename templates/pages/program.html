@@ -1,25 +1,30 @@
 <div class="program" id="program-root">
-    <div class="prog-bar">
-        <label class="prog-pick">Program
-            <select id="prog-select">
-                <option>Loading…</option>
-            </select>
-        </label>
-        <span class="prog-status" id="prog-status"></span>
-        <button id="prog-save" class="btn-primary" type="button" data-action="save">Save</button>
-    </div>
-    <div class="new-program">
-        <input type="text" id="new-program" placeholder="New program name">
-        <button type="button" data-action="add-program">New program</button>
-    </div>
-    <div id="service-list"></div>
-    <div class="add-service">
-        <h3>Add destination</h3>
-        <div class="add-grid">
-            <label>Service<input type="text" id="new-service" placeholder="e.g. 1"></label>
-            <label>Destination<input type="text" id="new-destination" placeholder="e.g. Burton"></label>
-            <label>Code<input type="text" id="new-code" placeholder="e.g. 101"></label>
+    <div class="prog-details">
+        <div class="prog-bar">
+            <label class="prog-pick">Program
+                <select id="prog-select">
+                    <option>Loading…</option>
+                </select>
+            </label>
+            <button id="prog-save" class="btn-primary" type="button" data-action="save">Save</button>
+            <button id="prog-delete" class="btn-danger" type="button" data-action="delete-program">Delete</button>
+            <span class="prog-status" id="prog-status"></span>
         </div>
-        <button type="button" class="btn-primary" data-action="add-destination">Add destination</button>
+        <div class="new-program">
+            <input type="text" id="new-program" placeholder="New program name">
+            <button type="button" data-action="add-program">New program</button>
+        </div>
+    </div>
+    <div class="prog-content">
+        <div id="service-list"></div>
+        <div class="add-service">
+            <h3>Add destination</h3>
+            <div class="add-grid">
+                <label>Service<input type="text" id="new-service" placeholder="e.g. 1"></label>
+                <label>Destination<input type="text" id="new-destination" placeholder="e.g. Burton"></label>
+                <label>Code<input type="text" id="new-code" placeholder="e.g. 101"></label>
+            </div>
+            <button type="button" class="btn-primary" data-action="add-destination">Add destination</button>
+        </div>
     </div>
 </div>
