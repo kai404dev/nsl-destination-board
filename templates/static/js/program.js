@@ -30,9 +30,9 @@
 
     function blankElements() {
         return {
-            number: { text: '', font: 'johnston100-45', colour: '#db9600', from_X: 210, to_X: 240, front_Y: 0, to_Y: 40, align: 'center', valign: 'middle' },
-            destination: { text: '', font: 'johnston100-33', colour: '#db9600', from_X: 0, to_X: 220, front_Y: 0, to_Y: 26, align: 'center', valign: 'middle' },
-            via: { text: '', font: 'johnston100-20', colour: '#db9600', from_X: 0, to_X: 220, front_Y: 26, to_Y: 40, align: 'center', valign: 'middle' }
+            number: { text: '', font: 'johnston100-45', colour: '#DB7700', from_X: 210, to_X: 240, front_Y: 0, to_Y: 40, align: 'center', valign: 'middle' },
+            destination: { text: '', font: 'johnston100-33', colour: '#DB7700', from_X: 0, to_X: 220, front_Y: 0, to_Y: 26, align: 'center', valign: 'middle' },
+            via: { text: '', font: 'johnston100-20', colour: '#DB7700', from_X: 0, to_X: 220, front_Y: 26, to_Y: 40, align: 'center', valign: 'middle' }
         };
     }
 
@@ -110,7 +110,7 @@
     var S = { name: '', data: null, dirty: false, lastSaved: 0 };
 
     var TEMPLATE_DEFAULTS = {
-        colour: '#DB9600', rotation_speed: 3, px_width: 240, px_height: 40
+        colour: '#DB7700', rotation_speed: 3, px_width: 240, px_height: 40
     };
 
     // Older .dest files may lack `defaults` - merge the template in so the
@@ -626,7 +626,7 @@
             var split = splitFont(el.font);
             return {
                 font: split.name, size: split.size,
-                color: el.colour || '#db9600',
+                color: el.colour || '#DB7700',
                 align: oneOf(el.align, ['left', 'center', 'right'], 'center'),
                 valign: oneOf(el.valign, ['top', 'middle', 'bottom'], 'middle'),
                 box: boxOf(el, fb)

@@ -1,6 +1,6 @@
 {
   "defaults": {
-    "colour": "#DB9600",
+    "colour": "#DB7700",
     "rotation_speed": 3,
     "px_width": 240,
     "px_height": 40
@@ -24,7 +24,7 @@
             "number": {
               "text": "1",
               "font": "johnston100-45",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 210,
               "to_X": 240,
               "front_Y": 0,
@@ -33,7 +33,7 @@
             "destination": {
               "text": "Tutbury",
               "font": "johnston100-31",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 0,
               "to_X": 210,
               "front_Y": 0,
@@ -42,7 +42,7 @@
             "via": {
               "text": "Stretton Rolleston",
               "font": "johnston100-20",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 0,
               "to_X": 210,
               "front_Y": 25,
@@ -53,7 +53,7 @@
             "number": {
               "text": "",
               "font": "johnston100-45",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 210,
               "to_X": 240,
               "front_Y": 0,
@@ -62,7 +62,7 @@
             "destination": {
               "text": "the tutbury jinnie",
               "font": "johnston100-29",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 0,
               "to_X": 240,
               "front_Y": 0,
@@ -71,7 +71,7 @@
             "via": {
               "text": "",
               "font": "johnston100-20",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 0,
               "to_X": 210,
               "front_Y": 25,
@@ -88,7 +88,7 @@
             "number": {
               "text": "1",
               "font": "johnston100-45",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 210,
               "to_X": 240,
               "front_Y": 0,
@@ -97,7 +97,7 @@
             "destination": {
               "text": "Burton",
               "font": "johnston100-31",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 0,
               "to_X": 210,
               "front_Y": 0,
@@ -106,7 +106,7 @@
             "via": {
               "text": "Stretton",
               "font": "johnston100-20",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 0,
               "to_X": 210,
               "front_Y": 25,

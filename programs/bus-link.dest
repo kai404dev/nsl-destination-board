@@ -1,6 +1,6 @@
 {
   "defaults": {
-    "colour": "#DB9600",
+    "colour": "#DB7700",
     "rotation_speed": 3,
     "px_width": 240,
     "px_height": 40
@@ -15,7 +15,7 @@
             "number": {
               "text": "",
               "font": "johnston100-45",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 210,
               "to_X": 240,
               "front_Y": 0,
@@ -24,7 +24,7 @@
             "destination": {
               "text": "Bus Link",
               "font": "johnston100-33",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 0,
               "to_X": 240,
               "front_Y": 0,
@@ -33,7 +33,7 @@
             "via": {
               "text": "Not in Service",
               "font": "johnston100-20",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 0,
               "to_X": 240,
               "front_Y": 26,
@@ -44,7 +44,7 @@
             "number": {
               "text": "",
               "font": "johnston100-45",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 210,
               "to_X": 240,
               "front_Y": 0,
@@ -53,7 +53,7 @@
             "destination": {
               "text": "Not in Service",
               "font": "johnston100-33",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 0,
               "to_X": 240,
               "front_Y": 0,
@@ -62,7 +62,7 @@
             "via": {
               "text": "Sorry",
               "font": "johnston100-20",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 0,
               "to_X": 240,
               "front_Y": 23,
@@ -81,7 +81,7 @@
             "number": {
               "text": "31",
               "font": "johnston100-45",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 200,
               "to_X": 240,
               "front_Y": 0,
@@ -92,7 +92,7 @@
             "destination": {
               "text": "Lichfield",
               "font": "johnston100-33",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 0,
               "to_X": 200,
               "front_Y": 0,
@@ -103,7 +103,7 @@
             "via": {
               "text": "City Circular",
               "font": "johnston100-18",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 0,
               "to_X": 200,
               "front_Y": 25,
@@ -116,7 +116,7 @@
             "number": {
               "text": "31",
               "font": "johnston100-45",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 200,
               "to_X": 240,
               "front_Y": 0,
@@ -127,7 +127,7 @@
             "destination": {
               "text": "",
               "font": "johnston100-33",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 0,
               "to_X": 200,
               "front_Y": 0,
@@ -138,7 +138,7 @@
             "via": {
               "text": "Trent Valley, Stowe\nMorrisons, Christ Church",
               "font": "johnston100-17",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 0,
               "to_X": 200,
               "front_Y": 0,
@@ -159,7 +159,7 @@
             "number": {
               "text": "32",
               "font": "johnston100-45",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 195,
               "to_X": 240,
               "front_Y": 0,
@@ -170,7 +170,7 @@
             "destination": {
               "text": "Lichfield",
               "font": "johnston100-33",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 0,
               "to_X": 200,
               "front_Y": 0,
@@ -181,7 +181,7 @@
             "via": {
               "text": "City Circular",
               "font": "johnston100-18",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 0,
               "to_X": 200,
               "front_Y": 25,
@@ -194,7 +194,7 @@
             "number": {
               "text": "32",
               "font": "johnston100-45",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 195,
               "to_X": 240,
               "front_Y": 0,
@@ -205,7 +205,7 @@
             "destination": {
               "text": "",
               "font": "johnston100-33",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 0,
               "to_X": 200,
               "front_Y": 0,
@@ -216,7 +216,7 @@
             "via": {
               "text": "Trent Valley\nMorrisons, Stowe",
               "font": "johnston100-21",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 0,
               "to_X": 200,
               "front_Y": 0,
@@ -237,7 +237,7 @@
             "number": {
               "text": "10s",
               "font": "johnston100-45",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 185,
               "to_X": 240,
               "front_Y": 0,
@@ -248,7 +248,7 @@
             "destination": {
               "text": "John Taylor",
               "font": "johnston100-33",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 0,
               "to_X": 185,
               "front_Y": 0,
@@ -259,7 +259,7 @@
             "via": {
               "text": "Free School",
               "font": "johnston100-20",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 0,
               "to_X": 185,
               "front_Y": 26,
@@ -272,7 +272,7 @@
             "number": {
               "text": "10s",
               "font": "johnston100-45",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 185,
               "to_X": 240,
               "front_Y": 0,
@@ -283,7 +283,7 @@
             "destination": {
               "text": "School Service",
               "font": "johnston100-28",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 0,
               "to_X": 185,
               "front_Y": 0,
@@ -294,7 +294,7 @@
             "via": {
               "text": "Students only",
               "font": "johnston100-20",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 0,
               "to_X": 185,
               "front_Y": 24,
@@ -313,7 +313,7 @@
             "number": {
               "text": "10s",
               "font": "johnston100-45",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 185,
               "to_X": 240,
               "front_Y": 0,
@@ -324,7 +324,7 @@
             "destination": {
               "text": "Acorn Inn",
               "font": "johnston100-33",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 0,
               "to_X": 185,
               "front_Y": 0,
@@ -335,7 +335,7 @@
             "via": {
               "text": "Shobnall",
               "font": "johnston100-20",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 0,
               "to_X": 185,
               "front_Y": 26,
@@ -348,7 +348,7 @@
             "number": {
               "text": "10s",
               "font": "johnston100-45",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 185,
               "to_X": 240,
               "front_Y": 0,
@@ -359,7 +359,7 @@
             "destination": {
               "text": "School Service",
               "font": "johnston100-28",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 0,
               "to_X": 185,
               "front_Y": 0,
@@ -370,7 +370,7 @@
             "via": {
               "text": "Students only",
               "font": "johnston100-20",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 0,
               "to_X": 185,
               "front_Y": 24,
@@ -391,7 +391,7 @@
             "number": {
               "text": "12e",
               "font": "johnston100-45",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 180,
               "to_X": 240,
               "front_Y": 0,
@@ -402,7 +402,7 @@
             "destination": {
               "text": "Burton",
               "font": "johnston100-33",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 0,
               "to_X": 180,
               "front_Y": 0,
@@ -413,7 +413,7 @@
             "via": {
               "text": "Farley Barton",
               "font": "johnston100-20",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 0,
               "to_X": 180,
               "front_Y": 20,
@@ -432,7 +432,7 @@
             "number": {
               "text": "12e",
               "font": "johnston100-45",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 180,
               "to_X": 240,
               "front_Y": 0,
@@ -443,7 +443,7 @@
             "destination": {
               "text": "Lichfiled",
               "font": "johnston100-33",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 0,
               "to_X": 180,
               "front_Y": 0,
@@ -454,7 +454,7 @@
             "via": {
               "text": "Farley Barton",
               "font": "johnston100-20",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 0,
               "to_X": 180,
               "front_Y": 20,
@@ -473,7 +473,7 @@
             "number": {
               "text": "12e",
               "font": "johnston100-45",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 180,
               "to_X": 240,
               "front_Y": 0,
@@ -484,7 +484,7 @@
             "destination": {
               "text": "Farley",
               "font": "johnston100-31",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 0,
               "to_X": 180,
               "front_Y": 0,
@@ -495,7 +495,7 @@
             "via": {
               "text": "part route",
               "font": "johnston100-20",
-              "colour": "#db9600",
+              "colour": "#DB7700",
               "from_X": 0,
               "to_X": 180,
               "front_Y": 21,

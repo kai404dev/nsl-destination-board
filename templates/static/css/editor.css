@@ -98,7 +98,7 @@
 }
 
 .pos-destination h3 {
-    color: #db9600;
+    color: #DB7700;
 }
 
 .pos-via h3 {
@@ -164,7 +164,7 @@
 }
 
 .new-program button:hover {
-    border-color: var(--accent, #db9600);
+    border-color: var(--accent, #DB7700);
 }
 
 .service-key {
@@ -209,12 +209,12 @@
 }
 
 .page-list button:hover {
-    border-color: var(--accent, #db9600);
+    border-color: var(--accent, #DB7700);
 }
 
 .page-list button.active {
-    background: var(--accent, #db9600);
-    border-color: var(--accent, #db9600);
+    background: var(--accent, #DB7700);
+    border-color: var(--accent, #DB7700);
     color: var(--accent-text, #141414);
     font-weight: 600;
 }
@@ -262,8 +262,8 @@
     margin-left: auto;
     flex-shrink: 0;
     background: transparent;
-    border: 1px solid var(--accent, #db9600);
-    color: var(--accent, #db9600);
+    border: 1px solid var(--accent, #DB7700);
+    color: var(--accent, #DB7700);
     border-radius: 8px;
     padding: 0.3rem 0.7rem;
     cursor: pointer;
@@ -379,12 +379,12 @@
 }
 
 .bdf-map .cell:hover {
-    border-color: var(--accent, #db9600);
+    border-color: var(--accent, #DB7700);
 }
 
 .bdf-map .cell.active {
-    background: var(--accent, #db9600);
-    border-color: var(--accent, #db9600);
+    background: var(--accent, #DB7700);
+    border-color: var(--accent, #DB7700);
 }
 
 .bdf-map .cell.active span {
@@ -449,7 +449,7 @@
 }
 
 .bdf-tools button:hover {
-    border-color: var(--accent, #db9600);
+    border-color: var(--accent, #DB7700);
 }
 
 #bdf-strip {
@@ -479,12 +479,12 @@
 }
 
 .bdf-subtabs button:hover {
-    border-color: var(--accent, #db9600);
+    border-color: var(--accent, #DB7700);
 }
 
 .bdf-subtabs button.active {
-    background: var(--accent, #db9600);
-    border-color: var(--accent, #db9600);
+    background: var(--accent, #DB7700);
+    border-color: var(--accent, #DB7700);
     color: var(--accent-text, #141414);
     font-weight: 600;
 }
@@ -539,7 +539,7 @@
 }
 
 .bdf-overview-bar button:hover {
-    border-color: var(--accent, #db9600);
+    border-color: var(--accent, #DB7700);
 }
 
 #bdf-overview-grid {

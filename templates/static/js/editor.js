@@ -60,9 +60,9 @@
         outerTab: 0,
         innerTab: 0,
         styles: {
-            number: { font: '', size: '', color: '#db9600', align: 'center', valign: 'middle', box: { x: 210, y: 0, w: 30, h: 40 } },
-            destination: { font: '', size: '', color: '#db9600', align: 'center', valign: 'middle', box: { x: 0, y: 0, w: 220, h: 26 } },
-            via: { font: '', size: '', color: '#db9600', align: 'center', valign: 'middle', box: { x: 0, y: 26, w: 220, h: 14 } }
+            number: { font: '', size: '', color: '#DB7700', align: 'center', valign: 'middle', box: { x: 210, y: 0, w: 30, h: 40 } },
+            destination: { font: '', size: '', color: '#DB7700', align: 'center', valign: 'middle', box: { x: 0, y: 0, w: 220, h: 26 } },
+            via: { font: '', size: '', color: '#DB7700', align: 'center', valign: 'middle', box: { x: 0, y: 26, w: 220, h: 14 } }
         }
     };
 
@@ -368,7 +368,7 @@
         return {
             text: text,
             font: (s.font || 'johnston100') + '-' + (s.size || '20'),
-            colour: s.color || '#db9600',
+            colour: s.color || '#DB7700',
             from_X: s.box.x,
             to_X: s.box.x + s.box.w,
             front_Y: s.box.y,
@@ -507,7 +507,7 @@
         var h = numOr(el.to_Y, fb.y + fb.h) - y;
         return {
             font: split.name, size: split.size,
-            color: el.colour || '#db9600',
+            color: el.colour || '#DB7700',
             align: oneOf(el.align, ['left', 'center', 'right'], 'center'),
             valign: oneOf(el.valign, ['top', 'middle', 'bottom'], 'middle'),
             box: {

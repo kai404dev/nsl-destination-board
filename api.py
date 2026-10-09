@@ -110,7 +110,7 @@ def save_program(programs_dir: Path, name: str, data: dict) -> tuple[bool, str]:
 
 PROGRAM_TEMPLATE = {
     "defaults": {
-        "colour": "#DB9600",
+        "colour": "#DB7700",
         "rotation_speed": 3,
         "px_width": 240,
         "px_height": 40,

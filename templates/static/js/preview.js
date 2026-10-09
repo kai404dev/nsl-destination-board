@@ -22,7 +22,7 @@
     var W = 240;
     var H = 40;
 
-    var GUIDE_COLORS = { number: '#4da3ff', destination: '#db9600', via: '#46c46a' };
+    var GUIDE_COLORS = { number: '#4da3ff', destination: '#DB7700', via: '#46c46a' };
 
     var cache = {}; // "name-size" -> Promise<font|null>, font = { glyphs, ascent, descent }
 
