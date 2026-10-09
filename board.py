@@ -293,8 +293,10 @@ def render_text_page(page: dict, W: int = 240, H: int = 40,
         if font is None:
             continue  # BDF unavailable: leave blank (preview falls back)
         box = element_box(el, W, H)
-        align = _one_of(el.get("align"), ("left", "center", "right"), "left")
-        valign = _one_of(el.get("valign"), ("top", "middle", "bottom"), "bottom")
+        # Missing align/valign default to center/middle (same as the studio
+        # draft loader) - older .dest entries omit them.
+        align = _one_of(el.get("align"), ("left", "center", "right"), "center")
+        valign = _one_of(el.get("valign"), ("top", "middle", "bottom"), "middle")
         _draw_string(px, W, H, font, text, box, align, valign,
                      parse_colour(el.get("colour")))
     return img

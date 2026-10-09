@@ -249,8 +249,8 @@
             var box = boxes[item.key];
             if (!box) return;
             drawRegion(ctx, fonts[item.key], item.text, box,
-                (opts.aligns && opts.aligns[item.key]) || 'left',
-                (opts.valigns && opts.valigns[item.key]) || 'bottom',
+                (opts.aligns && opts.aligns[item.key]) || 'center',
+                (opts.valigns && opts.valigns[item.key]) || 'middle',
                 opts.colors[item.key]);
         });
     }
