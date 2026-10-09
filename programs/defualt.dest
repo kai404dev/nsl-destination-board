@@ -11,7 +11,7 @@
         "service_code": "000",
         "service_name": "Not in Service",
         "bitmaps": [
-          "bitmaps/program/defualt/0/000-not-in-service.png"
+          "bitmaps/programs/defualt/0/noroute-not-in-service.png"
         ]
       }
     },

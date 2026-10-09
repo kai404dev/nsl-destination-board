@@ -1,0 +1,3 @@
+# Portal needs stdlib only. The board driver needs Pillow
+# (rgbmatrix itself is built from source via scripts/install.sh).
+Pillow>=10

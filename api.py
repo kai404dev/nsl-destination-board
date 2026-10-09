@@ -266,3 +266,94 @@ def write_bdf_glyph(path: Path, encoding: int, rows: list[list[int]]) -> tuple[b
     except OSError as exc:
         return False, f"cannot write font: {exc}"
     return True, "saved"
+
+
+# ---------------------------------------------------------------------------
+# Board selection: which program/service/destination the matrix plays.
+# Stored as JSON next to the programs (board_state.json) so the portal and
+# the board loop share it. The board notices changes within one frame.
+# ---------------------------------------------------------------------------
+
+SELECTION_FILE = "board_state.json"
+
+
+def _sorted_service_keys(services: dict) -> list[str]:
+    def key(k: str):
+        return (int(k) if k.isdigit() else 10**9, k)
+
+    return sorted(services, key=key)
+
+
+def list_services(program: dict) -> list[str]:
+    services = (program or {}).get("services")
+    if not isinstance(services, dict):
+        return []
+    return _sorted_service_keys(services)
+
+
+def list_destinations(program: dict, service: str) -> list[str]:
+    services = (program or {}).get("services") or {}
+    group = services.get(service)
+    if not isinstance(group, dict):
+        return []
+
+    def code_of(name: str) -> str:
+        dest = group.get(name) or {}
+        return str(dest.get("service_code") or "").strip()
+
+    def key(name: str):
+        code = code_of(name)
+        numeric = int(code) if code.isdigit() else None
+        return (0, numeric, "") if numeric is not None else (1, 0, code or name)
+
+    # Numeric codes first (numerically), then the rest alphabetically -
+    # same order the Program tab shows.
+    nums = sorted([n for n in group if code_of(n).isdigit()],
+                  key=lambda n: (int(code_of(n)), n))
+    rest = sorted([n for n in group if not code_of(n).isdigit()],
+                  key=lambda n: (code_of(n) or n, n))
+    return nums + rest
+
+
+def load_selection(root: Path) -> dict:
+    """Read board_state.json.
+
+    Returns a blank selection when nothing has been picked yet (or the
+    file is unreadable) - the board stays blank until the Controller
+    saves a selection. No auto-fallback: whatever is saved is returned
+    as-is; callers treat unresolvable selections as blank/invalid.
+    """
+    from pathlib import Path as _P
+
+    blank = {"program": "", "service": "", "destination": ""}
+    try:
+        raw = json.loads((_P(root) / SELECTION_FILE).read_text(encoding="utf-8"))
+        return {"program": str(raw.get("program") or ""),
+                "service": str(raw.get("service") or ""),
+                "destination": str(raw.get("destination") or "")}
+    except (OSError, ValueError, AttributeError):
+        return blank
+
+
+def save_selection(root: Path, program: str, service: str,
+                   destination: str) -> tuple[bool, str]:
+    """Validate and persist a new board selection. Returns (ok, message)."""
+    from pathlib import Path as _P
+
+    root = _P(root)
+    programs_dir = root / "programs"
+    data = load_program(programs_dir, program or "")
+    if data is None:
+        return False, "program not found"
+    if service not in list_services(data):
+        return False, "service not found"
+    if destination not in list_destinations(data, service):
+        return False, "destination not found"
+    sel = {"program": program, "service": service, "destination": destination}
+    try:
+        tmp = root / (SELECTION_FILE + ".tmp")
+        tmp.write_text(json.dumps(sel, indent=2) + "\n", encoding="utf-8")
+        tmp.replace(root / SELECTION_FILE)
+    except OSError as exc:
+        return False, f"cannot write selection: {exc}"
+    return True, "saved"

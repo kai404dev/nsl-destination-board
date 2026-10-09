@@ -1,12 +1,8 @@
 #!/usr/bin/env python3
-"""board.py - tiny zero-dependency web preview server for the sign templates.
+"""portal.py - web portal for the NSL destination board (stdlib only).
 
-Serves the HTML pages in ``templates/`` and the assets in
-``templates/static/`` so you can preview the board UI in a browser:
-
-    python3 board.py                # http://127.0.0.1:8000
-    python3 board.py --port 8080    # custom port
-    python3 board.py --open         # open a browser tab automatically
+    python portal.py                # http://127.0.0.1:8000
+    python portal.py --port 8080    # custom port
 
 Routes:
     /                               -> templates/index.html
@@ -22,6 +18,8 @@ Routes:
                                       -> GET/PUT .../glyphs/<encoding>
     /api/programs                     -> GET list, POST {"name"} to create
     /api/programs/<name>              -> GET/PUT/DELETE one .dest program
+    /api/board/state                  -> GET current board selection + info
+    /api/board/select                 -> POST {program,service,destination}
     /fonts/<path>                     -> raw BDF font files (canvas preview)
 """
 
@@ -47,6 +45,43 @@ PAGES_DIR = TEMPLATE_DIR / "pages"
 FONTS_DIR = ROOT / "fonts"
 PROGRAMS_DIR = ROOT / "programs"
 MAX_PROGRAM_BYTES = 2 * 1024 * 1024
+
+
+def _board_state_payload() -> dict:
+    """Current selection plus what the board will play (for Controller).
+
+    Blank/invalid selections report valid=False - the board shows nothing
+    until the Controller saves a real program/service/destination.
+    """
+    sel = api.load_selection(ROOT)
+    program = api.load_program(PROGRAMS_DIR, sel.get("program") or "")
+    if program is None:
+        return {"selection": sel, "valid": False, "pages": 0,
+                "rotation_speed": 3,
+                "services": [], "destinations": []}
+    services = api.list_services(program)
+    destinations = api.list_destinations(program, sel.get("service") or "")
+    if sel.get("service") not in services or sel.get("destination") not in destinations:
+        return {"selection": sel, "valid": False, "pages": 0,
+                "rotation_speed": 3, "services": services,
+                "destinations": destinations}
+    dest = ((program.get("services") or {}).get(sel.get("service") or "")
+            or {}).get(sel.get("destination") or "")
+    pages = 0
+    if isinstance(dest, dict):
+        text = dest.get("text")
+        bitmaps = dest.get("bitmaps")
+        if isinstance(text, dict):
+            pages = len(text)
+        elif isinstance(bitmaps, list):
+            pages = len(bitmaps)
+    try:
+        speed = float((program.get("defaults") or {}).get("rotation_speed", 3))
+    except (TypeError, ValueError):
+        speed = 3
+    return {"selection": sel, "valid": True, "pages": pages,
+            "rotation_speed": speed, "services": services,
+            "destinations": destinations}
 
 # Explicit page routes: URL path -> template file (relative to TEMPLATE_DIR).
 PAGE_ROUTES = {
@@ -132,6 +167,8 @@ class BoardHandler(SimpleHTTPRequestHandler):
         # 7. Programs API: list and fetch .dest files.
         if url_path in ("/api/programs", "/api/programs/"):
             return self._serve_json(api.list_programs(PROGRAMS_DIR))
+        if url_path in ("/api/board/state", "/api/board/state/"):
+            return self._serve_json(_board_state_payload())
         if url_path.startswith("/api/programs/"):
             name = urllib.parse.unquote(url_path[len("/api/programs/"):].strip("/"))
             program = api.load_program(PROGRAMS_DIR, name)
@@ -249,6 +286,21 @@ class BoardHandler(SimpleHTTPRequestHandler):
                 status = 409 if message == "program already exists" else 400
                 return self._serve_json({"error": message}, status=status)
             return self._serve_json({"ok": True, "name": (name or "").strip()}, status=201)
+
+        # Select what the board plays: POST {"program","service","destination"}.
+        if url_path in ("/api/board/select", "/api/board/select/"):
+            data, error = self._read_json_body()
+            if error:
+                return self._serve_json({"error": error}, status=400)
+            if not isinstance(data, dict):
+                return self._serve_json({"error": "body must be JSON"}, status=400)
+            ok, message = api.save_selection(
+                ROOT, str(data.get("program") or ""),
+                str(data.get("service") or ""),
+                str(data.get("destination") or ""))
+            if not ok:
+                return self._serve_json({"error": message}, status=400)
+            return self._serve_json({"ok": True, **_board_state_payload()})
 
         return self.send_error(404, f"Not found: {parsed.path}")
 

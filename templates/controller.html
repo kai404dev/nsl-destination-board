@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controller | NSL Board Portal</title>
+    <link rel="stylesheet" href="/static/css/portal.css">
+</head>
+<body>
+    <header class="topbar">
+        <a class="brand" href="/">NSL Board</a>
+        <span class="topbar-title">Controller</span>
+    </header>
+
+    <h1>Board Controller</h1>
+    <p class="muted">Pick which program / service / destination the LED board loops.
+       The board switches within one frame and remembers this across reboots.</p>
+
+    <div id="now-playing" class="muted">Loading…</div>
+
+    <label for="ctl-program">Program</label>
+    <select id="ctl-program"><option>Loading…</option></select>
+
+    <label for="ctl-service">Service</label>
+    <select id="ctl-service"><option>Select a program first</option></select>
+
+    <label for="ctl-destination">Destination</label>
+    <select id="ctl-destination"><option>Select a service first</option></select>
+
+    <div style="margin-top:1rem; display:flex; gap:0.75rem; flex-wrap:wrap;">
+        <button id="ctl-show" class="btn-primary" type="button">Show on board</button>
+    </div>
+    <p id="ctl-status" class="muted" role="status"></p>
+    <p id="ctl-info" class="muted"></p>
+
+    <script>
+    (function () {
+        var progEl = document.getElementById('ctl-program');
+        var servEl = document.getElementById('ctl-service');
+        var destEl = document.getElementById('ctl-destination');
+        var showBtn = document.getElementById('ctl-show');
+        var statusEl = document.getElementById('ctl-status');
+        var infoEl = document.getElementById('ctl-info');
+        var nowEl = document.getElementById('now-playing');
+        var cache = {}; // program name -> program JSON
+
+        function say(t) { statusEl.textContent = t; }
+
+        function fill(select, items, placeholder) {
+            select.innerHTML = '';
+            if (placeholder) {
+                var ph = document.createElement('option');
+                ph.value = '';
+                ph.textContent = placeholder;
+                select.appendChild(ph);
+            }
+            items.forEach(function (name) {
+                var o = document.createElement('option');
+                o.value = name;
+                o.textContent = name;
+                select.appendChild(o);
+            });
+        }
+
+        function serviceKeys(program) {
+            var services = (program && program.services) || {};
+            return Object.keys(services).sort(function (a, b) {
+                var na = /^\d+$/.test(a), nb = /^\d+$/.test(b);
+                if (na && nb) return parseInt(a, 10) - parseInt(b, 10);
+                if (na) return -1;
+                if (nb) return 1;
+                return a.localeCompare(b, undefined, { numeric: true });
+            });
+        }
+
+        function destinationsOf(program, service) {
+            var group = ((program.services || {})[service]) || {};
+            function code(n) { return (((group[n] || {}).service_code) || '').trim(); }
+            var nums = Object.keys(group).filter(function (n) { return /^\d+$/.test(code(n)); });
+            var rest = Object.keys(group).filter(function (n) { return !/^\d+$/.test(code(n)); });
+            nums.sort(function (a, b) { return parseInt(code(a), 10) - parseInt(code(b), 10) || (a < b ? -1 : 1); });
+            rest.sort(function (a, b) { return (code(a) || a).localeCompare(code(b) || b); });
+            return nums.concat(rest);
+        }
+
+        function getProgram(name) {
+            if (cache[name]) return Promise.resolve(cache[name]);
+            return fetch('/api/programs/' + encodeURIComponent(name))
+                .then(function (r) {
+                    if (!r.ok) throw new Error('HTTP ' + r.status);
+                    return r.json();
+                })
+                .then(function (p) { cache[name] = p; return p; });
+        }
+
+        function refreshState() {
+            return fetch('/api/board/state')
+                .then(function (r) { return r.json(); })
+                .then(function (s) {
+                    var sel = s.selection || {};
+                    if (s.valid) {
+                        nowEl.textContent = 'Now playing: ' + sel.program + ' / ' +
+                            sel.service + ' / ' + sel.destination +
+                            ' (' + s.pages + ' frame' + (s.pages === 1 ? '' : 's') +
+                            ', ' + s.rotation_speed + 's each)';
+                    } else {
+                        nowEl.textContent = 'Board has nothing to play yet.';
+                    }
+                    infoEl.textContent = '';
+                    // Preselect dropdowns to the live selection.
+                    if (sel.program && progEl.querySelector('option[value="' + CSS.escape(sel.program) + '"]')) {
+                        progEl.value = sel.program;
+                    }
+                    return onProgram(false).then(function () {
+                        if (sel.service && servEl.value !== sel.service &&
+                            servEl.querySelector('option[value="' + CSS.escape(sel.service) + '"]')) {
+                            servEl.value = sel.service;
+                        }
+                        return onService(false).then(function () {
+                            if (sel.destination) destEl.value = sel.destination;
+                        });
+                    });
+                });
+        }
+
+        function onProgram(resetChildren) {
+            var name = progEl.value;
+            if (!name) {
+                fill(servEl, [], 'Select a program first');
+                fill(destEl, [], 'Select a service first');
+                return Promise.resolve();
+            }
+            return getProgram(name).then(function (program) {
+                var services = serviceKeys(program);
+                var keep = resetChildren === false ? servEl.value : '';
+                fill(servEl, services);
+                if (keep && services.indexOf(keep) >= 0) servEl.value = keep;
+                return onService(resetChildren);
+            }).catch(function (err) {
+                console.error(err);
+                say('Could not load program');
+            });
+        }
+
+        function onService(resetChild) {
+            var prog = progEl.value, serv = servEl.value;
+            if (!prog || !serv) {
+                fill(destEl, [], 'Select a service first');
+                return Promise.resolve();
+            }
+            return getProgram(prog).then(function (program) {
+                var dests = destinationsOf(program, serv);
+                var keep = resetChild === false ? destEl.value : '';
+                fill(destEl, dests.map(function (n) {
+                    var code = (((program.services[serv][n] || {}).service_code) || '').trim();
+                    return n;
+                }));
+                // Show service codes alongside names.
+                destEl.innerHTML = '';
+                dests.forEach(function (n) {
+                    var code = (((program.services[serv][n] || {}).service_code) || '').trim();
+                    var o = document.createElement('option');
+                    o.value = n;
+                    o.textContent = code ? code + ' – ' + n : n;
+                    destEl.appendChild(o);
+                });
+                if (keep && dests.indexOf(keep) >= 0) destEl.value = keep;
+                // Frame info for the picked destination.
+                var dest = (((program.services || {})[serv] || {})[destEl.value || dests[0]]) || {};
+                var n = dest.text ? Object.keys(dest.text).length
+                    : (dest.bitmaps ? dest.bitmaps.length : 0);
+                var speed = (program.defaults || {}).rotation_speed || 3;
+                infoEl.textContent = dests.length
+                    ? 'Destination "' + (destEl.value || dests[0]) + '": ' + n +
+                      ' frame' + (n === 1 ? '' : 's') + ', rotates every ' + speed + 's.'
+                    : '';
+            });
+        }
+
+        progEl.addEventListener('change', function () { onProgram(true); });
+        servEl.addEventListener('change', function () { onService(true); });
+        destEl.addEventListener('change', function () { onService(false); });
+
+        showBtn.addEventListener('click', function () {
+            var body = { program: progEl.value, service: servEl.value, destination: destEl.value };
+            if (!body.program || !body.service || !body.destination) {
+                say('Pick a program, service and destination first.');
+                return;
+            }
+            say('Sending to board…');
+            showBtn.disabled = true;
+            fetch('/api/board/select', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            })
+                .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+                .then(function (res) {
+                    if (!res.ok) throw new Error((res.body && res.body.error) || 'failed');
+                    say('Board is now showing ' + body.program + ' / ' + body.service + ' / ' + body.destination + '.');
+                    refreshState();
+                })
+                .catch(function (err) {
+                    console.error(err);
+                    say('Could not update board: ' + err.message);
+                })
+                .then(function () { showBtn.disabled = false; });
+        });
+
+        // Boot: program list, then live selection.
+        fetch('/api/programs')
+            .then(function (r) { return r.json(); })
+            .then(function (names) {
+                if (!names.length) {
+                    fill(progEl, []);
+                    nowEl.textContent = 'No programs yet – create one in Sign Studio.';
+                    return;
+                }
+                fill(progEl, names);
+                return refreshState().then(function () { say(''); });
+            })
+            .catch(function (err) {
+                console.error(err);
+                nowEl.textContent = 'Could not reach portal API.';
+            });
+    })();
+    </script>
+</body>
+</html>
