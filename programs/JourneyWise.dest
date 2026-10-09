@@ -5,5 +5,585 @@
     "px_width": 240,
     "px_height": 40
   },
-  "services": {}
+  "services": {
+    "0": {
+      "not in service": {
+        "service_code": "",
+        "service_name": "not in service",
+        "text": {
+          "0:": {
+            "number": {
+              "text": "Not in\nservice",
+              "font": "johnston100-24",
+              "colour": "#db7700",
+              "from_X": 152,
+              "to_X": 239,
+              "front_Y": 0,
+              "to_Y": 40,
+              "align": "center",
+              "valign": "top",
+              "line_height": 16
+            },
+            "destination": {
+              "text": "Classic",
+              "font": "johnston100-47",
+              "colour": "#db7700",
+              "from_X": 0,
+              "to_X": 152,
+              "front_Y": 6,
+              "to_Y": 39,
+              "align": "center",
+              "valign": "middle"
+            },
+            "via": {
+              "text": "Midland",
+              "font": "johnston100-21",
+              "colour": "#db7700",
+              "from_X": 42,
+              "to_X": 118,
+              "front_Y": 0,
+              "to_Y": 14,
+              "align": "center",
+              "valign": "middle"
+            },
+            "images": [
+              {
+                "src": "bitmaps/shared/mdcl.png",
+                "x": 0,
+                "y": 0
+              }
+            ]
+          }
+        }
+      },
+      "JourneyWise": {
+        "service_code": "001",
+        "service_name": "JourneyWise",
+        "text": {
+          "0:": {
+            "number": {
+              "text": "",
+              "font": "johnston100-45",
+              "colour": "#db7700",
+              "from_X": 180,
+              "to_X": 240,
+              "front_Y": 0,
+              "to_Y": 40,
+              "align": "center",
+              "valign": "middle"
+            },
+            "destination": {
+              "text": "Not in Service",
+              "font": "johnston100-33",
+              "colour": "#db7700",
+              "from_X": 0,
+              "to_X": 240,
+              "front_Y": 10,
+              "to_Y": 43,
+              "align": "center",
+              "valign": "top"
+            },
+            "via": {
+              "text": "Sorry",
+              "font": "johnston100-22",
+              "colour": "#db7700",
+              "from_X": 16,
+              "to_X": 68,
+              "front_Y": 0,
+              "to_Y": 19,
+              "align": "center",
+              "valign": "bottom"
+            }
+          },
+          "2:": {
+            "number": {
+              "text": "",
+              "font": "johnston100-45",
+              "colour": "#db7700",
+              "from_X": 180,
+              "to_X": 240,
+              "front_Y": 0,
+              "to_Y": 40,
+              "align": "center",
+              "valign": "middle"
+            },
+            "destination": {
+              "text": "JourneyWise",
+              "font": "johnston100-35",
+              "colour": "#db7700",
+              "from_X": 0,
+              "to_X": 220,
+              "front_Y": 0,
+              "to_Y": 30,
+              "align": "center",
+              "valign": "top"
+            },
+            "via": {
+              "text": "Midlands",
+              "font": "johnston100-21",
+              "colour": "#db7700",
+              "from_X": 100,
+              "to_X": 255,
+              "front_Y": 21,
+              "to_Y": 40,
+              "align": "center",
+              "valign": "bottom"
+            }
+          }
+        }
+      }
+    },
+    "2": {
+      "Burton": {
+        "service_code": "201",
+        "service_name": "Burton",
+        "text": {
+          "0:": {
+            "number": {
+              "text": "2",
+              "font": "johnston100-45",
+              "colour": "#db7700",
+              "from_X": 180,
+              "to_X": 240,
+              "front_Y": 0,
+              "to_Y": 40,
+              "align": "center",
+              "valign": "middle"
+            },
+            "destination": {
+              "text": "Burton",
+              "font": "johnston100-33",
+              "colour": "#db7700",
+              "from_X": 0,
+              "to_X": 180,
+              "front_Y": 15,
+              "to_Y": 40,
+              "align": "center",
+              "valign": "middle"
+            },
+            "via": {
+              "text": "Fradley Alrewas",
+              "font": "johnston100-20",
+              "colour": "#db7700",
+              "from_X": 0,
+              "to_X": 180,
+              "front_Y": 0,
+              "to_Y": 18,
+              "align": "center",
+              "valign": "bottom"
+            }
+          },
+          "1:": {
+            "number": {
+              "text": "2",
+              "font": "johnston100-45",
+              "colour": "#db7700",
+              "from_X": 180,
+              "to_X": 240,
+              "front_Y": 0,
+              "to_Y": 40,
+              "align": "center",
+              "valign": "middle"
+            },
+            "destination": {
+              "text": "Burton",
+              "font": "johnston100-33",
+              "colour": "#db7700",
+              "from_X": 0,
+              "to_X": 180,
+              "front_Y": 15,
+              "to_Y": 40,
+              "align": "center",
+              "valign": "middle"
+            },
+            "via": {
+              "text": "Kings Bromley",
+              "font": "johnston100-20",
+              "colour": "#db7700",
+              "from_X": 0,
+              "to_X": 180,
+              "front_Y": 0,
+              "to_Y": 18,
+              "align": "center",
+              "valign": "bottom"
+            }
+          },
+          "2:": {
+            "number": {
+              "text": "2",
+              "font": "johnston100-45",
+              "colour": "#db7700",
+              "from_X": 180,
+              "to_X": 240,
+              "front_Y": 0,
+              "to_Y": 40,
+              "align": "center",
+              "valign": "middle"
+            },
+            "destination": {
+              "text": "Burton",
+              "font": "johnston100-33",
+              "colour": "#db7700",
+              "from_X": 0,
+              "to_X": 180,
+              "front_Y": 15,
+              "to_Y": 40,
+              "align": "center",
+              "valign": "middle"
+            },
+            "via": {
+              "text": "Yoxall Barton",
+              "font": "johnston100-20",
+              "colour": "#db7700",
+              "from_X": 0,
+              "to_X": 180,
+              "front_Y": 0,
+              "to_Y": 18,
+              "align": "center",
+              "valign": "bottom"
+            }
+          },
+          "3:": {
+            "number": {
+              "text": "",
+              "font": "johnston100-45",
+              "colour": "#db7700",
+              "from_X": 180,
+              "to_X": 240,
+              "front_Y": 0,
+              "to_Y": 40,
+              "align": "center",
+              "valign": "middle"
+            },
+            "destination": {
+              "text": "the two",
+              "font": "johnston100-50",
+              "colour": "#db7700",
+              "from_X": 0,
+              "to_X": 240,
+              "front_Y": 0,
+              "to_Y": 40,
+              "align": "center",
+              "valign": "middle",
+              "letter_spacing": -1,
+              "space_width": 15
+            },
+            "via": {
+              "text": "",
+              "font": "johnston100-20",
+              "colour": "#db7700",
+              "from_X": 0,
+              "to_X": 180,
+              "front_Y": 0,
+              "to_Y": 18,
+              "align": "center",
+              "valign": "bottom"
+            }
+          }
+        }
+      },
+      "Lichfield": {
+        "service_code": "202",
+        "service_name": "Lichfield",
+        "text": {
+          "0:": {
+            "number": {
+              "text": "2",
+              "font": "johnston100-45",
+              "colour": "#db7700",
+              "from_X": 180,
+              "to_X": 240,
+              "front_Y": 0,
+              "to_Y": 40,
+              "align": "center",
+              "valign": "middle"
+            },
+            "destination": {
+              "text": "Lichfield",
+              "font": "johnston100-33",
+              "colour": "#db7700",
+              "from_X": 0,
+              "to_X": 180,
+              "front_Y": 15,
+              "to_Y": 40,
+              "align": "center",
+              "valign": "middle"
+            },
+            "via": {
+              "text": "Barton Yoxall",
+              "font": "johnston100-20",
+              "colour": "#db7700",
+              "from_X": 0,
+              "to_X": 180,
+              "front_Y": 0,
+              "to_Y": 18,
+              "align": "center",
+              "valign": "bottom"
+            }
+          },
+          "1:": {
+            "number": {
+              "text": "2",
+              "font": "johnston100-45",
+              "colour": "#db7700",
+              "from_X": 180,
+              "to_X": 240,
+              "front_Y": 0,
+              "to_Y": 40,
+              "align": "center",
+              "valign": "middle"
+            },
+            "destination": {
+              "text": "Lichfield",
+              "font": "johnston100-33",
+              "colour": "#db7700",
+              "from_X": 0,
+              "to_X": 180,
+              "front_Y": 15,
+              "to_Y": 40,
+              "align": "center",
+              "valign": "middle"
+            },
+            "via": {
+              "text": "Kings Bromley",
+              "font": "johnston100-20",
+              "colour": "#db7700",
+              "from_X": 0,
+              "to_X": 180,
+              "front_Y": 0,
+              "to_Y": 18,
+              "align": "center",
+              "valign": "bottom"
+            }
+          },
+          "2:": {
+            "number": {
+              "text": "2",
+              "font": "johnston100-45",
+              "colour": "#db7700",
+              "from_X": 180,
+              "to_X": 240,
+              "front_Y": 0,
+              "to_Y": 40,
+              "align": "center",
+              "valign": "middle"
+            },
+            "destination": {
+              "text": "Lichfield",
+              "font": "johnston100-33",
+              "colour": "#db7700",
+              "from_X": 0,
+              "to_X": 180,
+              "front_Y": 15,
+              "to_Y": 40,
+              "align": "center",
+              "valign": "middle"
+            },
+            "via": {
+              "text": "Alrewas Fradley",
+              "font": "johnston100-20",
+              "colour": "#db7700",
+              "from_X": 0,
+              "to_X": 180,
+              "front_Y": 0,
+              "to_Y": 18,
+              "align": "center",
+              "valign": "bottom"
+            }
+          },
+          "3:": {
+            "number": {
+              "text": "",
+              "font": "johnston100-45",
+              "colour": "#db7700",
+              "from_X": 180,
+              "to_X": 240,
+              "front_Y": 0,
+              "to_Y": 40,
+              "align": "center",
+              "valign": "middle"
+            },
+            "destination": {
+              "text": "the two",
+              "font": "johnston100-50",
+              "colour": "#db7700",
+              "from_X": 0,
+              "to_X": 240,
+              "front_Y": 0,
+              "to_Y": 40,
+              "align": "center",
+              "valign": "middle",
+              "letter_spacing": -1,
+              "space_width": 15
+            },
+            "via": {
+              "text": "",
+              "font": "johnston100-20",
+              "colour": "#db7700",
+              "from_X": 0,
+              "to_X": 180,
+              "front_Y": 0,
+              "to_Y": 18,
+              "align": "center",
+              "valign": "bottom"
+            }
+          }
+        }
+      }
+    },
+    "700": {
+      "Leicester": {
+        "service_code": "",
+        "service_name": "Leicester",
+        "text": {
+          "0:": {
+            "number": {
+              "text": "700",
+              "font": "johnston100-40",
+              "colour": "#db7700",
+              "from_X": 180,
+              "to_X": 240,
+              "front_Y": 0,
+              "to_Y": 40,
+              "align": "center",
+              "valign": "middle"
+            },
+            "destination": {
+              "text": "Leicester",
+              "font": "johnston100-33",
+              "colour": "#db7700",
+              "from_X": 0,
+              "to_X": 180,
+              "front_Y": 0,
+              "to_Y": 25,
+              "align": "center",
+              "valign": "middle"
+            },
+            "via": {
+              "text": "First Class Express",
+              "font": "johnston100-18",
+              "colour": "#db7700",
+              "from_X": 0,
+              "to_X": 180,
+              "front_Y": 25,
+              "to_Y": 40,
+              "align": "center",
+              "valign": "middle"
+            }
+          },
+          "1:": {
+            "number": {
+              "text": "700",
+              "font": "johnston100-40",
+              "colour": "#db7700",
+              "from_X": 180,
+              "to_X": 240,
+              "front_Y": 0,
+              "to_Y": 40,
+              "align": "center",
+              "valign": "middle"
+            },
+            "destination": {
+              "text": "First Class",
+              "font": "johnston100-33",
+              "colour": "#db7700",
+              "from_X": 0,
+              "to_X": 180,
+              "front_Y": 0,
+              "to_Y": 25,
+              "align": "center",
+              "valign": "middle"
+            },
+            "via": {
+              "text": "to Leicester",
+              "font": "johnston100-20",
+              "colour": "#db7700",
+              "from_X": 0,
+              "to_X": 180,
+              "front_Y": 25,
+              "to_Y": 40,
+              "align": "center",
+              "valign": "middle"
+            }
+          }
+        }
+      },
+      "Peterborough": {
+        "service_code": "",
+        "service_name": "Peterborough",
+        "text": {
+          "1:": {
+            "number": {
+              "text": "700",
+              "font": "johnston100-40",
+              "colour": "#db7700",
+              "from_X": 180,
+              "to_X": 240,
+              "front_Y": 0,
+              "to_Y": 40,
+              "align": "center",
+              "valign": "middle"
+            },
+            "destination": {
+              "text": "Peterborough",
+              "font": "johnston100-27",
+              "colour": "#db7700",
+              "from_X": 0,
+              "to_X": 180,
+              "front_Y": 0,
+              "to_Y": 25,
+              "align": "center",
+              "valign": "middle"
+            },
+            "via": {
+              "text": "First Class Express",
+              "font": "johnston100-18",
+              "colour": "#db7700",
+              "from_X": 0,
+              "to_X": 180,
+              "front_Y": 25,
+              "to_Y": 40,
+              "align": "center",
+              "valign": "middle"
+            }
+          },
+          "2:": {
+            "number": {
+              "text": "700",
+              "font": "johnston100-40",
+              "colour": "#db7700",
+              "from_X": 180,
+              "to_X": 240,
+              "front_Y": 0,
+              "to_Y": 40,
+              "align": "center",
+              "valign": "middle"
+            },
+            "destination": {
+              "text": "First Class",
+              "font": "johnston100-33",
+              "colour": "#db7700",
+              "from_X": 0,
+              "to_X": 180,
+              "front_Y": 0,
+              "to_Y": 25,
+              "align": "center",
+              "valign": "middle"
+            },
+            "via": {
+              "text": "to Peterborough",
+              "font": "johnston100-20",
+              "colour": "#db7700",
+              "from_X": 0,
+              "to_X": 180,
+              "front_Y": 25,
+              "to_Y": 42,
+              "align": "center",
+              "valign": "bottom"
+            }
+          }
+        }
+      }
+    }
+  }
 }
