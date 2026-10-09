@@ -30,9 +30,9 @@
 
     function blankElements() {
         return {
-            number: { text: '', font: 'johnston100-45', colour: '#DB7700', from_X: 210, to_X: 240, front_Y: 0, to_Y: 40, align: 'center', valign: 'middle' },
-            destination: { text: '', font: 'johnston100-33', colour: '#DB7700', from_X: 0, to_X: 220, front_Y: 0, to_Y: 26, align: 'center', valign: 'middle' },
-            via: { text: '', font: 'johnston100-20', colour: '#DB7700', from_X: 0, to_X: 220, front_Y: 26, to_Y: 40, align: 'center', valign: 'middle' }
+            number: { text: '', font: 'johnston100-45', colour: '#DB7700', from_X: 180, to_X: 240, front_Y: 0, to_Y: 40, align: 'center', valign: 'middle' },
+            destination: { text: '', font: 'johnston100-33', colour: '#DB7700', from_X: 0, to_X: 180, front_Y: 0, to_Y: 25, align: 'center', valign: 'middle' },
+            via: { text: '', font: 'johnston100-18', colour: '#DB7700', from_X: 0, to_X: 180, front_Y: 25, to_Y: 40, align: 'center', valign: 'middle' }
         };
     }
 
@@ -101,9 +101,9 @@
     }
 
     var FALLBACK_BOXES = {
-        number: { x: 210, y: 0, w: 30, h: 40 },
-        destination: { x: 0, y: 0, w: 220, h: 26 },
-        via: { x: 0, y: 26, w: 220, h: 14 }
+        number: { x: 180, y: 0, w: 60, h: 40 },
+        destination: { x: 0, y: 0, w: 180, h: 25 },
+        via: { x: 0, y: 25, w: 180, h: 15 }
     };
 
     // Module state for the currently open program.

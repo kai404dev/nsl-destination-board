@@ -33,9 +33,9 @@
             via: { x: 0, y: 0, w: 220, h: 14 }
         },
         bottom: {
-            number: { x: 210, y: 0, w: 30, h: 40 },
-            destination: { x: 0, y: 0, w: 220, h: 26 },
-            via: { x: 0, y: 26, w: 220, h: 14 }
+            number: { x: 180, y: 0, w: 60, h: 40 },
+            destination: { x: 0, y: 0, w: 180, h: 25 },
+            via: { x: 0, y: 25, w: 180, h: 15 }
         },
         left: {
             number: { x: 0, y: 0, w: 30, h: 40 },
@@ -60,9 +60,9 @@
         outerTab: 0,
         innerTab: 0,
         styles: {
-            number: { font: '', size: '', color: '#DB7700', align: 'center', valign: 'middle', box: { x: 210, y: 0, w: 30, h: 40 } },
-            destination: { font: '', size: '', color: '#DB7700', align: 'center', valign: 'middle', box: { x: 0, y: 0, w: 220, h: 26 } },
-            via: { font: '', size: '', color: '#DB7700', align: 'center', valign: 'middle', box: { x: 0, y: 26, w: 220, h: 14 } }
+            number: { font: '', size: '', color: '#DB7700', align: 'center', valign: 'middle', box: { x: 180, y: 0, w: 60, h: 40 } },
+            destination: { font: '', size: '', color: '#DB7700', align: 'center', valign: 'middle', box: { x: 0, y: 0, w: 180, h: 25 } },
+            via: { font: '', size: '', color: '#DB7700', align: 'center', valign: 'middle', box: { x: 0, y: 25, w: 180, h: 15 } }
         }
     };
 
@@ -307,7 +307,7 @@
         var fontEl = $(root, group.fontId);
         var sizeEl = $(root, group.sizeId);
         if (!fontEl || !sizeEl || !fontEl.value) return Promise.resolve();
-        var preferred = { number: 45, destination: 33, via: 20 }[group.key] || 20;
+        var preferred = { number: 45, destination: 33, via: 18 }[group.key] || 18;
         return fetch('/api/sizes/' + encodeURIComponent(fontEl.value))
             .then(function (response) {
                 if (!response.ok) throw new Error('HTTP ' + response.status);
