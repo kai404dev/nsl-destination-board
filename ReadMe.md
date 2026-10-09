@@ -90,6 +90,7 @@ Defaults fit 3x 80x40 P4 panels in one chain (240x40). Override with flags:
 | `--led-multiplexing` | 0 | panel multiplexing quirk |
 | `--led-pwm-bits` | 11 | colour depth vs refresh tradeoff |
 | `--led-limit-refresh` | 0 | cap refresh Hz (0 = off) |
+| `--led-no-hardware-pulse` | on | avoids the `snd_bcm2835` sound-module clash (slightly more flicker). Use `--led-hardware-pulse` for best quality once onboard sound is disabled (`dtparam=audio=off` in `/boot/config.txt`) |
 | `--port` / `--host` | 8000 / 0.0.0.0 | portal bind |
 
 Rendering is logical (program `px_width`/`px_height`, usually 240x40)

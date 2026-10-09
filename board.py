@@ -377,6 +377,14 @@ def add_matrix_args(parser: argparse.ArgumentParser) -> None:
     g.add_argument("--led-multiplexing", type=int, default=0)
     g.add_argument("--led-pwm-bits", type=int, default=11)
     g.add_argument("--led-limit-refresh", type=int, default=0)
+    g.add_argument("--led-no-hardware-pulse", dest="led_no_hardware_pulse",
+                   action="store_true", default=True,
+                   help="default on: avoids the snd_bcm2835 sound-module clash "
+                        "(at the cost of slightly more flicker)")
+    g.add_argument("--led-hardware-pulse", dest="led_no_hardware_pulse",
+                   action="store_false",
+                   help="best display quality; only use once onboard sound is "
+                        "disabled (dtparam=audio=off)")
     g.add_argument("--panel-width", type=int, default=0,
                    help="override logical width (default: program px_width, 240)")
 
@@ -396,6 +404,7 @@ def create_matrix(args) -> tuple:
     opts.row_address_type = args.led_row_addr_type
     opts.multiplexing = args.led_multiplexing
     opts.pwm_bits = args.led_pwm_bits
+    opts.disable_hardware_pulsing = args.led_no_hardware_pulse
     if args.led_limit_refresh:
         opts.limit_refresh_rate_hz = args.led_limit_refresh
     matrix = RGBMatrix(options=opts)
