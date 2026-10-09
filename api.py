@@ -276,6 +276,12 @@ def write_bdf_glyph(path: Path, encoding: int, rows: list[list[int]]) -> tuple[b
 
 SELECTION_FILE = "board_state.json"
 
+# In-process override, set by save_selection(). The combined service runs
+# the portal and the board loop in one process, so even if the state file
+# is not writable (bad ownership, read-only FS) the board still switches
+# immediately - it just won't remember across reboots.
+_memory_selection: dict | None = None
+
 
 def _sorted_service_keys(services: dict) -> list[str]:
     def key(k: str):
@@ -325,6 +331,8 @@ def load_selection(root: Path) -> dict:
     """
     from pathlib import Path as _P
 
+    if _memory_selection is not None:
+        return dict(_memory_selection)
     blank = {"program": "", "service": "", "destination": ""}
     try:
         raw = json.loads((_P(root) / SELECTION_FILE).read_text(encoding="utf-8"))
@@ -337,9 +345,17 @@ def load_selection(root: Path) -> dict:
 
 def save_selection(root: Path, program: str, service: str,
                    destination: str) -> tuple[bool, str]:
-    """Validate and persist a new board selection. Returns (ok, message)."""
+    """Validate and persist a new board selection. Returns (ok, message).
+
+    The validated selection is always applied in-process (so the board
+    loop in the same service switches at once). If the state file cannot
+    be written, ok is still True but the message warns it won't survive
+    a reboot - callers should surface it (the portal sends it as
+    ``warning``).
+    """
     from pathlib import Path as _P
 
+    global _memory_selection
     root = _P(root)
     programs_dir = root / "programs"
     data = load_program(programs_dir, program or "")
@@ -350,10 +366,11 @@ def save_selection(root: Path, program: str, service: str,
     if destination not in list_destinations(data, service):
         return False, "destination not found"
     sel = {"program": program, "service": service, "destination": destination}
+    _memory_selection = dict(sel)
     try:
         tmp = root / (SELECTION_FILE + ".tmp")
         tmp.write_text(json.dumps(sel, indent=2) + "\n", encoding="utf-8")
         tmp.replace(root / SELECTION_FILE)
     except OSError as exc:
-        return False, f"cannot write selection: {exc}"
+        return True, f"on the board now, but NOT saved for reboot: {exc}"
     return True, "saved"

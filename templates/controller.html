@@ -197,7 +197,11 @@
                 .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
                 .then(function (res) {
                     if (!res.ok) throw new Error((res.body && res.body.error) || 'failed');
-                    say('Board is now showing ' + body.program + ' / ' + body.service + ' / ' + body.destination + '.');
+                    if (res.body && res.body.warning) {
+                        say('On the board now, but NOT remembered: ' + res.body.warning);
+                    } else {
+                        say('Board is now showing ' + body.program + ' / ' + body.service + ' / ' + body.destination + '.');
+                    }
                     refreshState();
                 })
                 .catch(function (err) {

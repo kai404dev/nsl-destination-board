@@ -300,7 +300,10 @@ class BoardHandler(SimpleHTTPRequestHandler):
                 str(data.get("destination") or ""))
             if not ok:
                 return self._serve_json({"error": message}, status=400)
-            return self._serve_json({"ok": True, **_board_state_payload()})
+            payload = {"ok": True, **_board_state_payload()}
+            if message != "saved":
+                payload["warning"] = message
+            return self._serve_json(payload)
 
         return self.send_error(404, f"Not found: {parsed.path}")
 
