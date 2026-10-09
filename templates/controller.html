@@ -6,59 +6,166 @@
     <title>Controller | NSL Board Portal</title>
     <link rel="stylesheet" href="/static/css/portal.css">
     <style>
-        /* Controller mode: landscape keypad layout (also toggleable by hand). */
+        /* Controller mode: the handset takes over the whole viewport. */
         #mode { display: none; }
-        body.ctl-mode #mode { display: grid; }
+        body.ctl-mode {
+            height: 100vh;
+            height: 100dvh;
+            overflow: hidden;
+            padding: 0.5rem;
+        }
+        body.ctl-mode .topbar,
+        body.ctl-mode h1,
+        body.ctl-mode .intro,
+        body.ctl-mode .tip,
+        body.ctl-mode #now-playing,
+        body.ctl-mode #ctl-info,
+        body.ctl-mode #ctl-status,
+        body.ctl-mode label[for="ctl-program"],
+        body.ctl-mode #ctl-program,
+        body.ctl-mode #ctl-show,
         body.ctl-mode label[for="ctl-service"],
         body.ctl-mode #ctl-service,
         body.ctl-mode label[for="ctl-destination"],
-        body.ctl-mode #ctl-destination { display: none; }
-        #mode {
-            grid-template-columns: minmax(0, 1fr) auto auto;
-            gap: 0.75rem;
-            align-items: stretch;
-            margin-top: 1rem;
-        }
-        .mode-preview { min-width: 0; display: flex; flex-direction: column; gap: 0.4rem; }
-        #mode-canvas {
-            width: 100%;
-            height: auto;
-            aspect-ratio: 6 / 1;
-            background: #000;
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            image-rendering: pixelated;
-            cursor: pointer;
-        }
-        .mode-keys {
+        body.ctl-mode #ctl-destination,
+        body.ctl-mode #ctl-mode { display: none; }
+        body.ctl-mode #mode { display: block; height: 100%; }
+
+        /* ICU-style handset: dark body, pale LCD, function keys, keypad.
+           Screen left, keypad right, F-row under the screen. */
+        .icu {
+            height: 100%;
             display: grid;
-            grid-template-columns: repeat(3, 58px);
-            gap: 0.4rem;
-            align-content: start;
+            grid-template-columns: minmax(0, 1fr) auto;
+            grid-template-rows: auto auto minmax(0, 1fr);
+            gap: 0.5rem 0.6rem;
+            background: #1b1e24;
+            border: 1px solid #343a44;
+            border-radius: 18px;
+            padding: 0.6rem;
         }
-        .mode-keys button, .mode-nav button {
-            min-height: 48px;
-            min-width: 48px;
-            font-size: 1.25rem;
-            background: var(--field);
-            color: var(--text);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
+        .icu .lcd { grid-column: 1; }
+        .icu .frow { grid-column: 1; }
+        .icu .msg { grid-column: 1; align-self: start; }
+        .lcd {
+            background: linear-gradient(180deg, #dcebf3, #c2d7e3);
+            border-radius: 8px;
+            padding: 0.5rem 0.6rem 0.35rem;
+            color: #21455c;
+            box-shadow: inset 0 2px 8px rgba(20, 40, 60, 0.35);
+        }
+        .lcd-top {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 0.6rem;
+            align-items: start;
+        }
+        .lcd-big {
+            font-family: Arial, Helvetica, system-ui, sans-serif;
+            font-weight: 700;
+            font-size: 1.45rem;
+            line-height: 1.25;
+            letter-spacing: 0.02em;
+            -webkit-font-smoothing: none;
+            font-smooth: never;
+            border: 2px solid #21455c;
+            padding: 0.05rem 0.5rem 0.15rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .lcd-meta {
+            font-family: ui-monospace, SFMono-Regular, monospace;
+            font-size: 0.72rem;
+            line-height: 1.55;
+            white-space: nowrap;
+        }
+        .softkeys {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-align: center;
+            padding-top: 0.2rem;
+            white-space: nowrap;
+            overflow: hidden;
+        }
+        .softkeys .hot {
+            background: #21455c;
+            color: #dcebf3;
+            border-radius: 3px;
+        }
+        .frow {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 0.4rem;
+        }
+        .frow button {
+            min-height: 40px;
+            background: #101319;
+            color: var(--accent);
+            border: 1px solid #343a44;
+            border-radius: 8px;
             cursor: pointer;
+            font: inherit;
+            font-weight: 700;
+            font-size: 0.85rem;
             touch-action: manipulation;
         }
-        .mode-keys button:active, .mode-nav button:active {
+        .frow button:active { border-color: var(--accent); }
+        .pad {
+            grid-column: 2;
+            grid-row: 1 / span 3;
+            display: grid;
+            grid-template-columns: repeat(3, minmax(56px, 1fr)) auto;
+            gap: 0.4rem;
+            align-content: stretch;
+        }
+        .mode-keys {
+            display: contents;
+        }
+        .mode-keys button, .mode-nav button {
+            background: #101319;
+            color: #f2f2f4;
+            border: 1px solid #343a44;
+            border-radius: 10px;
+            cursor: pointer;
+            font: inherit;
+            font-weight: 700;
+            font-size: 1.15rem;
+            line-height: 1.1;
+            touch-action: manipulation;
+            min-height: 44px;
+        }
+        .mode-keys button small {
+            display: block;
+            font-size: 0.6rem;
+            font-weight: 600;
+            color: #8b93a1;
+            letter-spacing: 0.08em;
+        }
+        .mode-keys button:active, .mode-nav button:active, .frow button:active {
             border-color: var(--accent);
         }
-        .mode-nav { display: flex; flex-direction: column; gap: 0.4rem; }
-        .mode-nav button { flex: 1; }
-        #mode-code {
-            text-align: center;
-            font-size: 1.4rem;
-            font-weight: 700;
-            min-height: 2rem;
-            letter-spacing: 0.2em;
+        .mode-keys .key-red { color: #e5484d; }
+        .mode-keys .key-green { color: #46c46a; }
+        #mode-caption.msg {
+            color: var(--accent);
+            font-size: 0.8rem;
+            font-family: ui-monospace, monospace;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            min-height: 1.1rem;
         }
+        .mode-nav {
+            grid-column: 4;
+            grid-row: 1 / span 4;
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+        .mode-nav button { flex: 1; min-width: 52px; }
         .tbtn {
             min-height: 44px;
             padding: 0.5rem 1.1rem;
@@ -74,6 +181,11 @@
             border-color: var(--accent);
             color: var(--accent);
         }
+        .tbtn svg, .frow button svg, .mode-keys button svg {
+            width: 1.1em;
+            height: 1.1em;
+            vertical-align: -0.15em;
+        }
     </style>
 </head>
 <body>
@@ -83,7 +195,7 @@
     </header>
 
     <h1>Board Controller</h1>
-    <p class="muted">Pick which program / service / destination the LED board loops.
+    <p class="muted intro">Pick which program / service / destination the LED board loops.
        The board switches within one frame and remembers this across reboots.</p>
 
     <div id="now-playing" class="muted">Loading…</div>
@@ -99,39 +211,53 @@
 
     <div style="margin-top:1rem; display:flex; gap:0.75rem; flex-wrap:wrap;">
         <button id="ctl-show" class="btn-primary" type="button">Show on board</button>
-        <button id="ctl-mode" class="tbtn" type="button" aria-pressed="false">📟 Controller mode</button>
+        <button id="ctl-mode" class="tbtn" type="button" aria-pressed="false"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"/><circle cx="10" cy="7" r="1" fill="currentColor" stroke="none"/><circle cx="14" cy="7" r="1" fill="currentColor" stroke="none"/><circle cx="10" cy="11" r="1" fill="currentColor" stroke="none"/><circle cx="14" cy="11" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="17.5" r="1.2" fill="currentColor" stroke="none"/></svg> <span id="ctl-mode-text">Controller mode</span></button>
     </div>
-    <p class="muted">Tip: rotate your phone sideways for the keypad. Tap the preview for the next page.</p>
+    <p class="muted tip">Tip: rotate your phone for keypad mode — type a code or use the arrows, then ⏎.</p>
     <p id="ctl-status" class="muted" role="status"></p>
     <p id="ctl-info" class="muted"></p>
 
     <div id="mode" aria-label="Controller keypad mode">
-        <div class="mode-preview">
-            <canvas id="mode-canvas" width="240" height="40" title="Tap for next page"></canvas>
-            <div id="mode-caption" class="muted">Pick a program above.</div>
-        </div>
+        <div class="icu">
+            <div class="lcd">
+                <div class="lcd-top">
+                    <div class="lcd-big" id="mode-big">–</div>
+                    <div class="lcd-meta" aria-hidden="true"><div>Line: <span id="mode-line">–</span></div><div>Dest: <span id="mode-dest">–</span></div><div>Extr: <span id="mode-extr">–</span></div></div>
+                </div>
+                <div class="softkeys" aria-hidden="true"><span></span><span class="hot">Send</span><span>Prev</span><span>Page</span><span>Next</span><span>Clear</span></div>
+            </div>
+            <div class="frow" role="group" aria-label="Function keys">
+                <button type="button" id="mode-home" aria-label="Exit controller mode"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg></button>
+                <button type="button" id="mode-f1">F1</button>
+                <button type="button" id="mode-f2">F2</button>
+                <button type="button" id="mode-f3">F3</button>
+                <button type="button" id="mode-f4">F4</button>
+                <button type="button" id="mode-f5">F5</button>
+            </div>
+            <div id="mode-caption" class="msg" aria-live="polite"></div>
+            <div class="pad">
         <div class="mode-keys" role="group" aria-label="Code keypad">
-            <button type="button" data-key="1">1</button>
-            <button type="button" data-key="2">2</button>
-            <button type="button" data-key="3">3</button>
-            <button type="button" data-key="4">4</button>
-            <button type="button" data-key="5">5</button>
-            <button type="button" data-key="6">6</button>
-            <button type="button" data-key="7">7</button>
-            <button type="button" data-key="8">8</button>
-            <button type="button" data-key="9">9</button>
-            <button type="button" data-key="C">C</button>
+            <button type="button" data-key="1">1<small>&nbsp;</small></button>
+            <button type="button" data-key="2">2<small>ABC</small></button>
+            <button type="button" data-key="3">3<small>DEF</small></button>
+            <button type="button" data-key="4">4<small>GHI</small></button>
+            <button type="button" data-key="5">5<small>JKL</small></button>
+            <button type="button" data-key="6">6<small>MNO</small></button>
+            <button type="button" data-key="7">7<small>PQRS</small></button>
+            <button type="button" data-key="8">8<small>TUV</small></button>
+            <button type="button" data-key="9">9<small>WXYZ</small></button>
+            <button type="button" data-key="B" class="key-red">X</button>
             <button type="button" data-key="0">0</button>
-            <button type="button" data-key="B">⌫</button>
+            <button type="button" data-key="E" class="key-green" aria-label="Enter"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12l5 5L20 6"/></svg></button>
         </div>
         <div class="mode-nav">
             <button type="button" id="mode-prev" aria-label="Previous destination">▲</button>
-            <div id="mode-code" aria-live="polite">–</div>
             <button type="button" id="mode-next" aria-label="Next destination">▼</button>
+        </div>
+            </div>
         </div>
     </div>
 
-    <script src="/static/js/preview.js"></script>
     <script>
     (function () {
         var progEl = document.getElementById('ctl-program');
@@ -283,13 +409,20 @@
         servEl.addEventListener('change', function () { onService(true); });
         destEl.addEventListener('change', function () { onService(false); });
 
-        showBtn.addEventListener('click', function () {
+        // Push the currently picked program/service/destination to the board.
+        // In controller mode the result also shows on the handset message line.
+        function sayBoth(t) {
+            say(t);
+            if (document.body.classList.contains('ctl-mode')) modeCaption(t);
+        }
+
+        function pushCurrent() {
             var body = { program: progEl.value, service: servEl.value, destination: destEl.value };
             if (!body.program || !body.service || !body.destination) {
-                say('Pick a program, service and destination first.');
+                sayBoth('Pick a program, service and destination first.');
                 return;
             }
-            say('Sending to board…');
+            sayBoth('Sending to board…');
             showBtn.disabled = true;
             fetch('/api/board/select', {
                 method: 'POST',
@@ -300,18 +433,20 @@
                 .then(function (res) {
                     if (!res.ok) throw new Error((res.body && res.body.error) || 'failed');
                     if (res.body && res.body.warning) {
-                        say('On the board now, but NOT remembered: ' + res.body.warning);
+                        sayBoth('On the board now, but NOT remembered: ' + res.body.warning);
                     } else {
-                        say('Board is now showing ' + body.program + ' / ' + body.service + ' / ' + body.destination + '.');
+                        sayBoth('Board is now showing ' + body.program + ' / ' + body.service + ' / ' + body.destination + '.');
                     }
                     refreshState();
                 })
                 .catch(function (err) {
                     console.error(err);
-                    say('Could not update board: ' + err.message);
+                    sayBoth('Could not update board: ' + err.message);
                 })
                 .then(function () { showBtn.disabled = false; });
-        });
+        }
+
+        showBtn.addEventListener('click', pushCurrent);
 
         // Boot: program list, then live selection.
         fetch('/api/programs')
@@ -336,13 +471,11 @@
            service_code, arrows step through all, preview shows the page
            about to be sent. Show on board pushes the current pick. */
         var D = { list: [], idx: -1, buffer: '', page: 0 };
-        var canvas = document.getElementById('mode-canvas');
         var captionEl = document.getElementById('mode-caption');
-        var codeEl = document.getElementById('mode-code');
         var modeBtn = document.getElementById('ctl-mode');
 
         function destCode(program, service, name) {
-            var dest = ((program.services || {})[service] || {})[name] || {};
+            var dest = (((program.services || {})[service] || {})[name]) || {};
             return (dest.service_code || '').trim();
         }
 
@@ -355,42 +488,6 @@
             });
         }
 
-        function splitFont(f) {
-            var s = String(f || '');
-            var i = s.lastIndexOf('-');
-            if (i < 0) return { name: s, size: '' };
-            return { name: s.slice(0, i), size: s.slice(i + 1) };
-        }
-
-        function numOr(v, fallback) {
-            var n = parseInt(v, 10);
-            return isNaN(n) ? fallback : n;
-        }
-
-        function oneOf(v, allowed, fallback) {
-            return allowed.indexOf(v) >= 0 ? v : fallback;
-        }
-
-        function pageBox(el, fb) {
-            el = el || {};
-            var y = numOr(el.front_Y != null ? el.front_Y : el.from_Y, fb.y);
-            var x = numOr(el.from_X, fb.x);
-            var w = numOr(el.to_X, fb.x + fb.w) - x;
-            var h = numOr(el.to_Y, fb.y + fb.h) - y;
-            return {
-                x: Math.max(0, Math.min(239, x)),
-                y: Math.max(0, Math.min(39, y)),
-                w: w >= 1 && w <= 240 ? w : fb.w,
-                h: h >= 1 && h <= 40 ? h : fb.h
-            };
-        }
-
-        var MODE_FB = {
-            number: { x: 180, y: 0, w: 60, h: 40 },
-            destination: { x: 0, y: 0, w: 180, h: 25 },
-            via: { x: 0, y: 25, w: 180, h: 15 }
-        };
-
         function pageKeys(text) {
             return Object.keys(text || {}).sort(function (a, b) {
                 function n(k) {
@@ -401,20 +498,36 @@
             });
         }
 
+        var lastLabel = '';
         function modeCaption(text) {
-            if (captionEl) captionEl.textContent = text;
+            lastLabel = text;
+            paintMsg();
+        }
+
+        function paintMsg() {
+            if (captionEl) captionEl.textContent = (D.buffer ? '> ' + D.buffer + '_ · ' : '') + lastLabel;
         }
 
         function updateCodeReadout() {
-            if (codeEl) codeEl.textContent = D.buffer || '–';
+            paintMsg();
+        }
+
+        function setLCD(big, line, dest, extr) {
+            setText('mode-big', big);
+            setText('mode-line', line);
+            setText('mode-dest', dest);
+            setText('mode-extr', extr);
+        }
+
+        function setText(id, text) {
+            var el = document.getElementById(id);
+            if (el) el.textContent = text;
         }
 
         function renderModePreview() {
             var d = D.list[D.idx];
-            if (!canvas) return;
             if (!d) {
-                var ctx0 = canvas.getContext('2d');
-                if (ctx0) { ctx0.fillStyle = '#000'; ctx0.fillRect(0, 0, 240, 40); }
+                setLCD('–', '–', '–', '');
                 modeCaption('No destinations in this program.');
                 return;
             }
@@ -425,51 +538,19 @@
                 var label = (d.code ? d.code + ' – ' : '') + d.destination + ' · service ' + d.service;
                 if (text && typeof text === 'object' && Object.keys(text).length) {
                     var keys = pageKeys(text);
-                    var key = keys[D.page % keys.length];
+                    var i = D.page % keys.length;
+                    var key = keys[i];
                     var page = text[key] || {};
-                    if (!window.NSLPreview) {
-                        modeCaption(label + ' (preview unavailable)');
-                        return;
-                    }
-                    var colors = {}, fonts = {}, boxes = {}, aligns = {}, valigns = {};
-                    ['number', 'destination', 'via'].forEach(function (k) {
-                        var el = page[k] || {};
-                        var split = splitFont(el.font);
-                        colors[k] = el.colour || '#DB7700';
-                        fonts[k] = { name: split.name, size: split.size };
-                        boxes[k] = pageBox(el, MODE_FB[k]);
-                        aligns[k] = oneOf(el.align, ['left', 'center', 'right'], 'center');
-                        valigns[k] = oneOf(el.valign, ['top', 'middle', 'bottom'], 'middle');
-                    });
-                    window.NSLPreview.render(canvas, {
-                        layout: 'bottom',
-                        number: (page.number || {}).text || '',
-                        destination: (page.destination || {}).text || '',
-                        via: (page.via || {}).text || '',
-                        colors: colors, fonts: fonts, boxes: boxes,
-                        aligns: aligns, valigns: valigns, dots: true
-                    });
-                    modeCaption(label + ' · ' + key + ' (' + (D.page % keys.length + 1) + '/' + keys.length + ') — tap preview for next page');
+                    var num = ((page.number || {}).text) || '';
+                    var nam = ((page.destination || {}).text) || d.destination;
+                    setLCD((num ? num + ' ' : '') + nam, d.service, d.code || '–', (i + 1) + '/' + keys.length);
+                    modeCaption(label + ' · ' + key + ' (' + (i + 1) + '/' + keys.length + ')');
                 } else if (Array.isArray(bitmaps) && bitmaps.length) {
-                    var rel = String(bitmaps[D.page % bitmaps.length] || '').replace(/^\/+/, '');
-                    var ctx = canvas.getContext('2d');
-                    var img = new Image();
-                    img.onload = function () {
-                        ctx.fillStyle = '#000';
-                        ctx.fillRect(0, 0, 240, 40);
-                        try {
-                            ctx.imageSmoothingEnabled = false;
-                            ctx.drawImage(img, 0, 0, 240, 40);
-                        } catch (err) { /* ignore */ }
-                    };
-                    img.onerror = function () {
-                        ctx.fillStyle = '#000';
-                        ctx.fillRect(0, 0, 240, 40);
-                        modeCaption(label + ' (bitmap missing)');
-                    };
-                    img.src = '/' + rel;
-                    modeCaption(label + ' · bitmap ' + (D.page % bitmaps.length + 1) + '/' + bitmaps.length);
+                    var j = D.page % bitmaps.length;
+                    setLCD((d.code ? d.code + ' ' : '') + d.destination, d.service, d.code || '–', (j + 1) + '/' + bitmaps.length);
+                    modeCaption(label + ' · bitmap ' + (j + 1) + '/' + bitmaps.length);
                 } else {
+                    setLCD(d.destination, d.service, d.code || '–', '');
                     modeCaption(label + ' (empty)');
                 }
             }).catch(function (err) {
@@ -494,6 +575,13 @@
         }
 
         function modeKey(k) {
+            if (k === 'E') {
+                // Enter: push whatever is currently picked (typed or arrows).
+                D.buffer = '';
+                updateCodeReadout();
+                pushCurrent();
+                return;
+            }
             if (k === 'C') {
                 D.buffer = '';
             } else if (k === 'B') {
@@ -559,9 +647,33 @@
             updateCodeReadout();
             modeSelect(D.idx + 1);
         });
-        if (canvas) canvas.addEventListener('click', function () {
-            D.page++;
-            renderModePreview();
+
+        // Softkeys: F1 send, F2 prev, F3 next preview page, F4 next, F5 clear.
+        function fPrev() {
+            D.buffer = '';
+            updateCodeReadout();
+            modeSelect(D.idx - 1);
+        }
+        function fNext() {
+            D.buffer = '';
+            updateCodeReadout();
+            modeSelect(D.idx + 1);
+        }
+        var fmap = {
+            'mode-f1': function () { modeKey('E'); },
+            'mode-f2': fPrev,
+            'mode-f3': function () { D.page++; renderModePreview(); },
+            'mode-f4': fNext,
+            'mode-f5': function () { D.buffer = ''; updateCodeReadout(); }
+        };
+        Object.keys(fmap).forEach(function (id) {
+            var btn = document.getElementById(id);
+            if (btn) btn.addEventListener('click', fmap[id]);
+        });
+        var homeBtn = document.getElementById('mode-home');
+        if (homeBtn) homeBtn.addEventListener('click', function () {
+            modeManual = false;
+            applyMode();
         });
 
         // Toggle, with auto-enable on landscape phones.
@@ -574,7 +686,8 @@
             document.body.classList.toggle('ctl-mode', on);
             if (modeBtn) {
                 modeBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
-                modeBtn.textContent = on ? '📟 Exit controller mode' : '📟 Controller mode';
+                var modeLabel = modeBtn.querySelector('#ctl-mode-text');
+                if (modeLabel) modeLabel.textContent = on ? 'Exit controller mode' : 'Controller mode';
             }
             if (on) syncMode();
         }
