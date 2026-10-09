@@ -1,0 +1,87 @@
+{
+    "defaults": {
+        "colour": "#DB9600",
+        "rotation_speed": 3,
+        "px_width": 240,
+        "px_height": 40
+    },
+    "services": {
+        "0": {
+            "Not in Service": {
+                "service_code": "000",
+                "service_name": "Not in Service",
+                "bitmaps": [
+                    "bitmaps/program/defualt/0/000-not-in-service.png"
+                ]
+            }
+        },
+        "1": {
+            "Burton": {
+                "service_code": "101",
+                "service_name": "Burton",
+                "text": {
+                    "0:": {
+                        "number": {
+                            "text": "1",
+                            "font": "johnston100-45",
+                            "colour": "#0080db",
+                            "from_X": "230",
+                            "to_X": "240",
+                            "front_Y": "1",
+                            "to_Y": "40"
+                        },
+                        "via": {
+                            "text": "Stretton",
+                            "font": "johnston100-20",
+                            "from_X": "1",
+                            "to_X": "230",
+                            "front_Y": "26",
+                            "to_Y": "40"
+                        },
+                        "destination": {
+                            "text": "Tutbury",
+                            "font": "johnston100-31",
+                            "from_X": "1",
+                            "to_X": "230",
+                            "front_Y": "1",
+                            "to_Y": "26"
+                        }
+                    }
+                }
+            },
+            "Tutbury": {
+                "service_code": "102",
+                "service_name": "Tutbury",
+                "text": {
+                    "0:": {
+                        "number": {
+                            "text": "1",
+                            "font": "johnston100-45",
+                            "colour": "#0080db",
+                            "from_X": "230",
+                            "to_X": "240",
+                            "front_Y": "1",
+                            "to_Y": "40"
+                        },
+                        "via": {
+                            "text": "Stretton",
+                            "font": "johnston100-20",
+                            "from_X": "1",
+                            "to_X": "230",
+                            "front_Y": "26",
+                            "to_Y": "40"
+                        },
+                        "destination": {
+                            "text": "Burton",
+                            "font": "johnston100-31",
+                            "from_X": "1",
+                            "to_X": "230",
+                            "front_Y": "1",
+                            "to_Y": "26"
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
