@@ -104,7 +104,7 @@ def save_program(programs_dir: Path, name: str, data: dict) -> tuple[bool, str]:
         tmp.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
         tmp.replace(path)
     except OSError as exc:
-        return False, f"cannot write program: {exc}"
+        return False, f"cannot write program: {exc} (see ReadMe 'Service permissions')"
     return True, "saved"
 
 

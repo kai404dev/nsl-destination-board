@@ -128,6 +128,8 @@ Wants=network-online.target
 [Service]
 Type=simple
 User=root
+Group={your user, e.g. kai}
+UMask=0002
 WorkingDirectory={where ever you cloned the repo to}
 ExecStart={where ever you cloned the repo to}/.venv/bin/python main.py --portal --board
 Restart=always
@@ -144,3 +146,36 @@ sudo systemctl enable --now board.service
 sudo systemctl status board.service
 journalctl -u board.service -f
 ```
+
+After changing the unit file, reload and restart:
+```bash
+sudo systemctl daemon-reload
+sudo systemctl restart board.service
+```
+
+### Service permissions (read this if saves fail)
+
+The service runs as `root` (the LED driver needs GPIO), but you also
+work in the repo as your normal user. Without the setup below, files
+the service creates (`board_state.json`, updated `.dest` files) end up
+owned by `root` and portal saves fail with e.g.:
+
+> cannot write program: [Errno 13] Permission denied: '.../bus-link.dest.tmp'
+
+`Group=` + `UMask=` in the unit above make service-created files
+group-writable, and this one-time setup hands the group to your user
+(run with your repo path and username):
+
+```bash
+cd ~/nsl-destination-board
+sudo chgrp -R kai .
+sudo chmod -R g+rwX .
+sudo chmod g+s . programs
+sudo systemctl restart board.service
+```
+
+This means both the service and your user can write programs, fonts
+and `board_state.json`, whether the portal runs under systemd or you
+start it by hand for testing. If permission errors persist, check
+ownership with `ls -l` — every file under the repo should show group
+`kai` (or your user) with `rw` for the group.
