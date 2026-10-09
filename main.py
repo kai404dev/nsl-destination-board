@@ -52,6 +52,14 @@ def main(argv=None) -> None:
     if not run_portal and not run_board:
         run_portal = run_board = True  # bare `python main.py` runs both
 
+    # Every boot starts blank: forget any previously picked destination so
+    # the panels stay clear until the Controller picks one.
+    import api
+    from pathlib import Path as _P
+
+    api.clear_selection(_P(__file__).resolve().parent)
+    print("Board selection cleared - booting to a blank screen")
+
     threads: list[threading.Thread] = []
     if run_portal:
         template_dir = portal.TEMPLATE_DIR

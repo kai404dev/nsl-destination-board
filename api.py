@@ -402,6 +402,16 @@ def load_selection(root: Path) -> dict:
         return blank
 
 
+def clear_selection(root: Path) -> None:
+    """Forget the saved board selection (boot to a blank screen)."""
+    global _memory_selection
+    _memory_selection = None
+    try:
+        (root / SELECTION_FILE).unlink()
+    except OSError:
+        pass
+
+
 def save_selection(root: Path, program: str, service: str,
                    destination: str) -> tuple[bool, str]:
     """Validate and persist a new board selection. Returns (ok, message).

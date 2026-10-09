@@ -60,9 +60,10 @@ and are referenced by repo-relative paths in the `.dest` file.
 ### Choosing what plays (Controller tab)
 
 Open `/controller`, pick Program → Service → Destination, then
-**Show on board**. The choice is saved to `board_state.json`, so the
-board resumes it after a reboot. Until anything is picked (fresh install,
-no state file) the panels stay blank. API:
+**Show on board**. The choice is saved to `board_state.json` and plays
+until the app restarts — every boot starts blank, so pick again after a
+reboot. Until anything is picked (fresh boot included) the panels stay
+blank. API:
 
 * `GET /api/board/state` — current selection + page count + speed
 * `POST /api/board/select {"program","service","destination"}`
