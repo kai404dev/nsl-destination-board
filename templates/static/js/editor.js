@@ -16,11 +16,11 @@
 
     var GROUPS = [
         { key: 'number', textId: null, fontId: 'number-font', sizeId: 'number-size', colorId: 'number-color',
-          xId: 'number-x', yId: 'number-y', wId: 'number-w', hId: 'number-h', alignId: 'number-align', valignId: 'number-valign' },
+          xId: 'number-x', yId: 'number-y', wId: 'number-w', hId: 'number-h', alignId: 'number-align', valignId: 'number-valign', lhId: 'number-lh', lgId: 'number-lg', lsId: 'number-ls', spaceId: 'number-sp' },
         { key: 'destination', textId: 'sign-destination', fontId: 'dest-font', sizeId: 'dest-size', colorId: 'dest-color',
-          xId: 'dest-x', yId: 'dest-y', wId: 'dest-w', hId: 'dest-h', alignId: 'dest-align', valignId: 'dest-valign' },
+          xId: 'dest-x', yId: 'dest-y', wId: 'dest-w', hId: 'dest-h', alignId: 'dest-align', valignId: 'dest-valign', lhId: 'dest-lh', lgId: 'dest-lg', lsId: 'dest-ls', spaceId: 'dest-sp' },
         { key: 'via', textId: 'sign-via', fontId: 'via-font', sizeId: 'via-size', colorId: 'via-color',
-          xId: 'via-x', yId: 'via-y', wId: 'via-w', hId: 'via-h', alignId: 'via-align', valignId: 'via-valign' }
+          xId: 'via-x', yId: 'via-y', wId: 'via-w', hId: 'via-h', alignId: 'via-align', valignId: 'via-valign', lhId: 'via-lh', lgId: 'via-lg', lsId: 'via-ls', spaceId: 'via-sp' }
     ];
 
     // Quick-position presets (from_X/to_X/front_Y/to_Y scheme as in
@@ -59,15 +59,78 @@
         dots: true,
         outerTab: 0,
         innerTab: 0,
+        images: [],
         styles: {
-            number: { font: '', size: '', color: '#DB7700', align: 'center', valign: 'middle', box: { x: 180, y: 0, w: 60, h: 40 } },
-            destination: { font: '', size: '', color: '#DB7700', align: 'center', valign: 'middle', box: { x: 0, y: 0, w: 180, h: 25 } },
-            via: { font: '', size: '', color: '#DB7700', align: 'center', valign: 'middle', box: { x: 0, y: 25, w: 180, h: 15 } }
+            number: { font: '', size: '', color: '#DB7700', align: 'center', valign: 'middle', lineHeight: null, lineGap: 0, letterSpacing: 0, spaceWidth: null, box: { x: 180, y: 0, w: 60, h: 40 } },
+            destination: { font: '', size: '', color: '#DB7700', align: 'center', valign: 'middle', lineHeight: null, lineGap: 0, letterSpacing: 0, spaceWidth: null, box: { x: 0, y: 0, w: 180, h: 25 } },
+            via: { font: '', size: '', color: '#DB7700', align: 'center', valign: 'middle', lineHeight: null, lineGap: 0, letterSpacing: 0, spaceWidth: null, box: { x: 0, y: 25, w: 180, h: 15 } }
         }
     };
 
+    // Line-height field: empty = auto (null), otherwise clamped px.
+    function lineHeightOf(root, id) {
+        var el = id && root.querySelector('#' + id);
+        if (!el || String(el.value).trim() === '') return null;
+        var n = parseInt(el.value, 10);
+        if (isNaN(n)) return null;
+        return Math.max(1, Math.min(256, n));
+    }
+
+    function lineGapOf(root, id) {
+        var el = id && root.querySelector('#' + id);
+        if (!el || String(el.value).trim() === '') return 0;
+        var n = parseInt(el.value, 10);
+        if (isNaN(n)) return 0;
+        return Math.max(-64, Math.min(200, n));
+    }
+
+    function letterSpacingOf(root, id) {
+        var el = id && root.querySelector('#' + id);
+        if (!el || String(el.value).trim() === '') return 0;
+        var n = parseInt(el.value, 10);
+        if (isNaN(n)) return 0;
+        return Math.max(-20, Math.min(40, n));
+    }
+
+    // Space width field: empty = font default (null), otherwise clamped px.
+    function spaceWidthOf(root, id) {
+        var el = id && root.querySelector('#' + id);
+        if (!el || String(el.value).trim() === '') return null;
+        var n = parseInt(el.value, 10);
+        if (isNaN(n)) return null;
+        return Math.max(0, Math.min(64, n));
+    }
+
     function $(root, id) {
         return root.querySelector('#' + id);
+    }
+
+    // Studio display size from the Settings tab (falls back to 240x40).
+    function edims() {
+        try {
+            if (window.NSLSettings) return window.NSLSettings.dims();
+        } catch (err) { /* ignore */ }
+        return { w: 240, h: 40 };
+    }
+
+    // Fresh-draft defaults: factory values overlaid with the user's
+    // Settings (colour, layout, per-element fonts/sizes).
+    function defaultDraft() {
+        var d = JSON.parse(JSON.stringify(DEFAULTS));
+        try {
+            if (!window.NSLSettings) return d;
+            var s = window.NSLSettings.get();
+            d.layout = s.layout || d.layout;
+            ['number', 'destination', 'via'].forEach(function (k) {
+                if (s.colour) d.styles[k].color = s.colour;
+                var f = (s.fonts || {})[k] || {};
+                if (f.font) d.styles[k].font = f.font;
+                if (f.size !== undefined && f.size !== null && String(f.size) !== '') {
+                    d.styles[k].size = String(f.size);
+                }
+            });
+        } catch (err) { /* ignore */ }
+        return d;
     }
 
     function loadDraft() {
@@ -83,6 +146,7 @@
 
     function collectState(root) {
         var styles = {};
+        var D = edims();
         GROUPS.forEach(function (group) {
             var fontEl = $(root, group.fontId);
             var sizeEl = $(root, group.sizeId);
@@ -94,11 +158,15 @@
                 color: colorEl ? colorEl.value : '',
                 align: val(root, group.alignId) || fb.align,
                 valign: val(root, group.valignId) || fb.valign,
+                lineHeight: lineHeightOf(root, group.lhId),
+                lineGap: lineGapOf(root, group.lgId),
+                letterSpacing: letterSpacingOf(root, group.lsId),
+                spaceWidth: spaceWidthOf(root, group.spaceId),
                 box: {
-                    x: num(root, group.xId, 0, 239, fb.box.x),
-                    y: num(root, group.yId, 0, 39, fb.box.y),
-                    w: num(root, group.wId, 1, 240, fb.box.w),
-                    h: num(root, group.hId, 1, 40, fb.box.h)
+                    x: num(root, group.xId, 0, D.w - 1, fb.box.x),
+                    y: num(root, group.yId, 0, D.h - 1, fb.box.y),
+                    w: num(root, group.wId, 1, D.w, fb.box.w),
+                    h: num(root, group.hId, 1, D.h, fb.box.h)
                 }
             };
         });
@@ -116,8 +184,73 @@
             outerTab: activeIndex(root, '.side-bar > .tabs'),
             innerTab: activeIndex(root, '.sign-attributes > .tabs'),
             styles: styles,
+            images: readPageImages(root),
             updatedAt: Date.now()
         };
+    }
+
+    // Font-size stepper (−/+ beside each Size select): move one step
+    // through the loaded sizes for that font, then preview + autosave.
+    function stepSize(root, btn, scheduleSave) {
+        var sel = btn.dataset.sizeTarget && root.querySelector('#' + btn.dataset.sizeTarget);
+        if (!sel || !sel.options || sel.options.length < 2) return;
+        var dir = parseInt(btn.dataset.sizeStep, 10) || 0;
+        var next = Math.max(0, Math.min(sel.options.length - 1, sel.selectedIndex + dir));
+        if (next === sel.selectedIndex) return;
+        sel.selectedIndex = next;
+        scheduleSave();
+    }
+
+    // Positioned bitmaps live in #page-images rows (data-idx). Read them
+    // back for autosave / preview / program writes.
+    function cleanImageSpec(spec) {
+        if (!spec || typeof spec !== 'object') return null;
+        var src = String(spec.src || '').trim().replace(/\\/g, '/').replace(/^\/+/, '');
+        if (src.indexOf('bitmaps/') !== 0) return null;
+        function i(v, fallback, lo, hi) {
+            var n = parseInt(v, 10);
+            if (isNaN(n)) return fallback;
+            return Math.max(lo, Math.min(hi, n));
+        }
+        var out = { src: src, x: i(spec.x, 0, -1024, 1024), y: i(spec.y, 0, -256, 256) };
+        [ 'w', 'h' ].forEach(function (k) {
+            if (spec[k] === undefined || spec[k] === null || String(spec[k]).trim() === '') return;
+            var n = parseInt(spec[k], 10);
+            if (!isNaN(n) && n >= 1 && n <= 1024) out[k] = n;
+        });
+        return out;
+    }
+
+    function readPageImages(root) {
+        var box = root.querySelector('#page-images');
+        if (!box) return (window.__nslImages || []).slice(0, 8);
+        var rows = box.querySelectorAll('.page-image');
+        // No rows rendered yet (e.g. first paint before applyState):
+        // fall back to the in-memory list so a linked page load isn't lost.
+        if (!rows.length) return (window.__nslImages || []).slice(0, 8);
+        var out = [];
+        rows.forEach(function (row) {
+            var spec = cleanImageSpec({
+                src: row.dataset.src,
+                x: (row.querySelector('[data-field="x"]') || {}).value,
+                y: (row.querySelector('[data-field="y"]') || {}).value,
+                w: (row.querySelector('[data-field="w"]') || {}).value,
+                h: (row.querySelector('[data-field="h"]') || {}).value
+            });
+            if (spec) out.push(spec);
+        });
+        window.__nslImages = out.slice();
+        return out.slice(0, 8);
+    }
+
+    function setPageImages(root, images) {
+        var clean = [];
+        (images || []).forEach(function (spec) {
+            var c = cleanImageSpec(spec);
+            if (c) clean.push(c);
+        });
+        window.__nslImages = clean.slice(0, 8);
+        renderPageImages(root);
     }
 
     function num(root, id, min, max, fallback) {
@@ -169,6 +302,10 @@
             setVal(root, group.colorId, saved.color || fb.color);
             setVal(root, group.alignId, saved.align || fb.align);
             setVal(root, group.valignId, saved.valign || fb.valign);
+            setVal(root, group.lhId, saved.lineHeight !== undefined && saved.lineHeight !== null ? saved.lineHeight : '');
+            setVal(root, group.lgId, saved.lineGap !== undefined && saved.lineGap !== null ? saved.lineGap : 0);
+            setVal(root, group.lsId, saved.letterSpacing !== undefined && saved.letterSpacing !== null ? saved.letterSpacing : 0);
+            setVal(root, group.spaceId, saved.spaceWidth !== undefined && saved.spaceWidth !== null ? saved.spaceWidth : '');
             setBox(root, group, saved.box || fb.box);
             // Fonts + sizes resolve async; stash what to select once loaded.
             var fontEl = $(root, group.fontId);
@@ -178,6 +315,7 @@
         });
         markActive(root, '.side-bar > .tabs', state.outerTab || 0);
         markActive(root, '.sign-attributes > .tabs', state.innerTab || 0);
+        setPageImages(root, state.images || []);
     }
 
     function setBox(root, group, box) {
@@ -201,17 +339,18 @@
         var number = boxes.number;
         var dest = boxes.destination;
         var via = boxes.via;
+        var W = edims().w;
 
         if (layout === 'left') {
             number.x = 0;
             var edge = number.x + number.w + 2;
-            if (dest.x < edge) dest.x = Math.min(edge, 240 - dest.w);
-            if (via.x < edge) via.x = Math.min(edge, 240 - via.w);
+            if (dest.x < edge) dest.x = Math.min(edge, W - dest.w);
+            if (via.x < edge) via.x = Math.min(edge, W - via.w);
         } else if (layout === 'top' || layout === 'right') {
-            number.x = Math.max(0, 240 - number.w);
+            number.x = Math.max(0, W - number.w);
             stackAbove(via, dest); // via above dest
         } else if (layout === 'bottom') {
-            number.x = Math.max(0, 240 - number.w);
+            number.x = Math.max(0, W - number.w);
             stackAbove(dest, via); // dest above via
         }
         // 'none': leave everything where it is (via just isn't drawn)
@@ -221,13 +360,14 @@
 
     function readBoxes(root) {
         var boxes = {};
+        var D = edims();
         GROUPS.forEach(function (group) {
             var fb = DEFAULTS.styles[group.key].box;
             boxes[group.key] = {
-                x: num(root, group.xId, 0, 239, fb.x),
-                y: num(root, group.yId, 0, 39, fb.y),
-                w: num(root, group.wId, 1, 240, fb.w),
-                h: num(root, group.hId, 1, 40, fb.h)
+                x: num(root, group.xId, 0, D.w - 1, fb.x),
+                y: num(root, group.yId, 0, D.h - 1, fb.y),
+                w: num(root, group.wId, 1, D.w, fb.w),
+                h: num(root, group.hId, 1, D.h, fb.h)
             };
         });
         return boxes;
@@ -246,15 +386,16 @@
         var boxes = readBoxes(root);
         var number = boxes.number;
         var others = [boxes.destination, boxes.via];
+        var W = edims().w;
 
         if (side === 'left') {
             number.x = 0;
             var edge = number.x + number.w + 2;
             others.forEach(function (b) {
-                if (b.x < edge) b.x = Math.min(edge, 240 - b.w);
+                if (b.x < edge) b.x = Math.min(edge, W - b.w);
             });
         } else {
-            number.x = Math.max(0, 240 - number.w);
+            number.x = Math.max(0, W - number.w);
             others.forEach(function (b) {
                 if (b.x + b.w > number.x) b.x = Math.max(0, number.x - b.w);
             });
@@ -266,13 +407,14 @@
     // Place `top` directly above `bottom`, keeping both sizes. Anchors on
     // `bottom` unless that would push `top` off-screen.
     function stackAbove(top, bottom) {
+        var H = edims().h;
         top.y = bottom.y - top.h;
         if (top.y < 0) {
             top.y = 0;
             bottom.y = top.h;
         }
-        if (bottom.y + bottom.h > 40) {
-            bottom.y = 40 - bottom.h;
+        if (bottom.y + bottom.h > H) {
+            bottom.y = H - bottom.h;
         }
     }
 
@@ -290,7 +432,7 @@
         });
     }
 
-    function fillSelect(selectEl, items, pendingValue, fallbackIndex) {
+    function fillSelect(selectEl, items, pendingValue, fallbackIndex, labels) {
         selectEl.innerHTML = '';
         if (!items.length) {
             var opt = document.createElement('option');
@@ -298,10 +440,10 @@
             selectEl.appendChild(opt);
             return;
         }
-        items.forEach(function (item) {
+        items.forEach(function (item, i) {
             var option = document.createElement('option');
             option.value = String(item);
-            option.textContent = String(item);
+            option.textContent = (labels && labels[i] != null) ? String(labels[i]) : String(item);
             selectEl.appendChild(option);
         });
         var pending = pendingValue || selectEl.dataset.pending || '';
@@ -310,12 +452,17 @@
         selectEl.dataset.pending = '';
     }
 
+    // Nearest numeric size to the target. Non-numeric tokens (e.g. the
+    // WxH entries under the default family) are skipped; if none qualify,
+    // index 0 (smallest first - list_sizes sorts that way).
     function nearestIndex(sizes, target) {
-        var best = 0;
+        var best = -1;
         sizes.forEach(function (size, i) {
-            if (Math.abs(size - target) < Math.abs(sizes[best] - target)) best = i;
+            var n = Number(size);
+            if (isNaN(n)) return;
+            if (best < 0 || Math.abs(n - target) < Math.abs(Number(sizes[best]) - target)) best = i;
         });
-        return best;
+        return best < 0 ? 0 : best;
     }
 
     function loadFonts(root) {
@@ -357,22 +504,52 @@
                 return response.json();
             })
             .then(function (sizes) {
-                fillSelect(sizeEl, sizes, '', nearestIndex(sizes, preferred));
+                // WxH bitmap families (e.g. 10x20) have a single size whose
+                // number is meaningless - show the family name instead.
+                var labels = null;
+                if (sizes.length === 1 && /^\d+x\d+[a-z]*$/i.test(fontEl.value || '')) {
+                    labels = [fontEl.value];
+                }
+                fillSelect(sizeEl, sizes, '', nearestIndex(sizes, preferred), labels);
             })
             .catch(function (err) {
                 console.error(err);
             });
     }
 
+    // Size the canvas backing store from the Settings display size
+    // (3x supersample for crisp dots) and keep input bounds in sync.
+    function sizeCanvas(root) {
+        var D = edims();
+        var canvas = root.querySelector('#sign-canvas');
+        if (canvas) {
+            canvas.width = D.w * 3;
+            canvas.height = D.h * 3;
+        }
+        GROUPS.forEach(function (group) {
+            [['xId', 0, D.w - 1], ['yId', 0, D.h - 1],
+             ['wId', 1, D.w], ['hId', 1, D.h]].forEach(function (spec) {
+                var el = $(root, group[spec[0]]);
+                if (el) {
+                    el.min = spec[1];
+                    el.max = spec[2];
+                }
+            });
+        });
+    }
+
     function renderPreview(root) {
         var canvas = root.querySelector('#sign-canvas');
         if (!canvas || !window.NSLPreview) return;
+        sizeCanvas(root);
+        var D = edims();
         var state = collectState(root);
         var colors = {};
         var fonts = {};
         var boxes = {};
         var aligns = {};
         var valigns = {};
+        var spacings = {};
         GROUPS.forEach(function (group) {
             var s = state.styles[group.key];
             var fb = DEFAULTS.styles[group.key];
@@ -381,19 +558,215 @@
             boxes[group.key] = s.box;
             aligns[group.key] = s.align;
             valigns[group.key] = s.valign;
+            spacings[group.key] = { lineHeight: s.lineHeight, lineGap: s.lineGap, letterSpacing: s.letterSpacing, spaceWidth: s.spaceWidth };
         });
         window.NSLPreview.render(canvas, {
             layout: state.layout,
             number: state.route,
             destination: state.destination,
             via: state.via,
+            width: D.w,
+            height: D.h,
             colors: colors,
             fonts: fonts,
             boxes: boxes,
             aligns: aligns,
             valigns: valigns,
+            spacings: spacings,
+            images: state.images || [],
             guides: state.guides,
             dots: state.dots
+        });
+    }
+
+    // ---- Bitmaps: library, upload, per-page positioning ----
+
+    function bitmapSay(root, text) {
+        var el = root.querySelector('#bitmap-upload-status');
+        if (el) el.textContent = text;
+    }
+
+    function fetchBitmaps() {
+        return fetch('/api/bitmaps').then(function (response) {
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            return response.json();
+        });
+    }
+
+    function shortName(path) {
+        return String(path || '').split('/').pop();
+    }
+
+    function renderLibrary(root, files) {
+        var box = root.querySelector('#bitmap-library');
+        if (!box) return;
+        box.innerHTML = '';
+        if (!files.length) {
+            box.innerHTML = '<p class="muted">No bitmaps yet — upload one above.</p>';
+            return;
+        }
+        files.forEach(function (f) {
+            var path = f.path || f;
+            var cell = document.createElement('div');
+            cell.className = 'bitmap-cell';
+            var img = document.createElement('img');
+            img.src = '/' + path;
+            img.alt = shortName(path);
+            img.loading = 'lazy';
+            var label = document.createElement('span');
+            label.textContent = shortName(path);
+            label.title = path;
+            var row = document.createElement('div');
+            row.className = 'row';
+            var add = document.createElement('button');
+            add.type = 'button';
+            add.textContent = 'Place';
+            add.addEventListener('click', function () { addImageToPage(root, path); });
+            var del = document.createElement('button');
+            del.type = 'button';
+            del.className = 'danger';
+            del.textContent = 'Delete';
+            del.setAttribute('aria-label', 'Delete ' + path);
+            del.addEventListener('click', function () { deleteBitmap(root, path); });
+            row.appendChild(add);
+            row.appendChild(del);
+            cell.appendChild(img);
+            cell.appendChild(label);
+            cell.appendChild(row);
+            box.appendChild(cell);
+        });
+    }
+
+    function refreshLibrary(root, say) {
+        var box = root.querySelector('#bitmap-library');
+        if (!box) return;
+        if (say) box.innerHTML = '<p class="muted">Loading…</p>';
+        fetchBitmaps()
+            .then(function (files) { renderLibrary(root, files || []); })
+            .catch(function (err) {
+                console.error(err);
+                box.innerHTML = '<p class="muted">Could not load bitmaps.</p>';
+            });
+    }
+
+    function uploadBitmap(root) {
+        var input = root.querySelector('#bitmap-file');
+        var file = input && input.files && input.files[0];
+        if (!file) {
+            bitmapSay(root, 'Choose a file first');
+            return;
+        }
+        bitmapSay(root, 'Uploading…');
+        var reader = new FileReader();
+        reader.onload = function () {
+            fetch('/api/bitmaps', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filename: file.name, data: String(reader.result || '') })
+            })
+                .then(function (response) {
+                    return response.json().then(function (body) {
+                        return { ok: response.ok, body: body };
+                    });
+                })
+                .then(function (res) {
+                    if (!res.ok) throw new Error((res.body && res.body.error) || 'upload failed');
+                    bitmapSay(root, 'Uploaded ' + shortName(res.body.path));
+                    if (input) input.value = '';
+                    refreshLibrary(root, false);
+                })
+                .catch(function (err) {
+                    console.error(err);
+                    bitmapSay(root, 'Upload failed: ' + err.message);
+                });
+        };
+        reader.onerror = function () { bitmapSay(root, 'Could not read file'); };
+        reader.readAsDataURL(file);
+    }
+
+    function deleteBitmap(root, path) {
+        if (!window.confirm('Delete ' + shortName(path) + '? Pages using it will show text only.')) return;
+        fetch('/api/bitmaps/' + path, { method: 'DELETE' })
+            .then(function (response) {
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                return response.json();
+            })
+            .then(function () { refreshLibrary(root, false); })
+            .catch(function (err) {
+                console.error(err);
+                bitmapSay(root, 'Delete failed');
+            });
+    }
+
+    function addImageToPage(root, path) {
+        var images = readPageImages(root);
+        if (images.length >= 8) {
+            bitmapSay(root, 'A page holds at most 8 bitmaps');
+            return;
+        }
+        if (images.some(function (im) { return im.src === path; })) {
+            bitmapSay(root, 'Already on this page — adjust X/Y below');
+            return;
+        }
+        images.push({ src: path, x: 0, y: 0 });
+        setPageImages(root, images);
+        renderPreview(root);
+        save(root);
+    }
+
+    function renderPageImages(root) {
+        var box = root.querySelector('#page-images');
+        if (!box) return;
+        var images = window.__nslImages || [];
+        box.innerHTML = '';
+        if (!images.length) {
+            box.innerHTML = '<p class="muted">None yet — pick Place in the library.</p>';
+            return;
+        }
+        images.forEach(function (spec, idx) {
+            var row = document.createElement('div');
+            row.className = 'page-image';
+            row.dataset.src = spec.src;
+            var head = document.createElement('div');
+            head.className = 'head';
+            var thumb = document.createElement('img');
+            thumb.src = '/' + spec.src;
+            thumb.alt = shortName(spec.src);
+            var name = document.createElement('span');
+            name.textContent = shortName(spec.src);
+            name.title = spec.src;
+            var remove = document.createElement('button');
+            remove.type = 'button';
+            remove.textContent = 'Remove';
+            remove.setAttribute('aria-label', 'Remove ' + spec.src);
+            remove.dataset.removeImage = String(idx);
+            head.appendChild(thumb);
+            head.appendChild(name);
+            head.appendChild(remove);
+            var grid = document.createElement('div');
+            grid.className = 'grid';
+            [['x', 'X', 0], ['y', 'Y', 0], ['w', 'W', ''], ['h', 'H', '']].forEach(function (f) {
+                var label = document.createElement('label');
+                label.textContent = f[1];
+                var input = document.createElement('input');
+                input.type = 'number';
+                input.dataset.field = f[0];
+                input.dataset.idx = String(idx);
+                input.value = spec[f[0]] !== undefined ? spec[f[0]] : f[2];
+                if (f[0] === 'x' || f[0] === 'y') {
+                    input.min = f[0] === 'x' ? -1024 : -256;
+                    input.max = f[0] === 'x' ? 1024 : 256;
+                } else {
+                    input.min = 1;
+                    input.max = 1024;
+                    input.placeholder = 'auto';
+                }
+                label.appendChild(input);
+                grid.appendChild(label);
+            });
+            row.appendChild(head);
+            row.appendChild(grid);
+            box.appendChild(row);
         });
     }
 
@@ -408,7 +781,7 @@
     }
 
     function pageElement(text, s) {
-        return {
+        var el = {
             text: text,
             font: (s.font || 'johnston100') + '-' + (s.size || '20'),
             colour: s.color || '#DB7700',
@@ -419,6 +792,38 @@
             align: s.align || 'center',
             valign: s.valign || 'middle'
         };
+        // Only store non-default spacing, so .dest files stay clean.
+        if (s.lineHeight !== undefined && s.lineHeight !== null && s.lineHeight !== '') {
+            var lh = parseInt(s.lineHeight, 10);
+            if (!isNaN(lh) && lh >= 1 && lh <= 256) el.line_height = lh;
+        }
+        if (s.lineGap !== undefined && s.lineGap !== null && s.lineGap !== '' && parseInt(s.lineGap, 10)) {
+            var lg = parseInt(s.lineGap, 10);
+            if (!isNaN(lg)) el.line_gap = Math.max(-64, Math.min(200, lg));
+        }
+        if (s.letterSpacing !== undefined && s.letterSpacing !== null && s.letterSpacing !== '' && parseInt(s.letterSpacing, 10)) {
+            var ls = parseInt(s.letterSpacing, 10);
+            if (!isNaN(ls)) el.letter_spacing = Math.max(-20, Math.min(40, ls));
+        }
+        if (s.spaceWidth !== undefined && s.spaceWidth !== null && s.spaceWidth !== '') {
+            var sw = parseInt(s.spaceWidth, 10);
+            if (!isNaN(sw)) el.space_width = Math.max(0, Math.min(64, sw));
+        }
+        return el;
+    }
+
+    function buildPage(state) {
+        var page = {
+            number: pageElement(state.route, state.styles.number),
+            destination: pageElement(state.destination, state.styles.destination),
+            via: pageElement(state.via, state.styles.via)
+        };
+        if (state.images && state.images.length) {
+            page.images = state.images.map(function (im) {
+                return cleanImageSpec(im);
+            }).filter(Boolean);
+        }
+        return page;
     }
 
     function renderPageLink(root) {
@@ -466,11 +871,7 @@
                 }
                 var dest = services[ctx.destination];
                 if (!dest.text || typeof dest.text !== 'object') dest.text = {};
-                dest.text[ctx.page] = {
-                    number: pageElement(state.route, state.styles.number),
-                    destination: pageElement(state.destination, state.styles.destination),
-                    via: pageElement(state.via, state.styles.via)
-                };
+                dest.text[ctx.page] = buildPage(state);
                 return fetch('/api/programs/' + encodeURIComponent(ctx.program), {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
@@ -541,25 +942,59 @@
         return allowed.indexOf(v) >= 0 ? v : fallback;
     }
 
+    function spacingFromPage(el) {
+        el = el || {};
+        var lh = (el.line_height === undefined || el.line_height === null || el.line_height === '')
+            ? null : parseInt(el.line_height, 10);
+        if (lh === null || isNaN(lh) || lh < 1 || lh > 256) lh = null;
+        var lg = parseInt(el.line_gap, 10);
+        if (isNaN(lg)) lg = 0;
+        var ls = parseInt(el.letter_spacing, 10);
+        if (isNaN(ls)) ls = 0;
+        var sw = (el.space_width === undefined || el.space_width === null || el.space_width === '')
+            ? null : parseInt(el.space_width, 10);
+        if (sw !== null && (isNaN(sw) || sw < 0 || sw > 64)) sw = null;
+        return { lineHeight: lh, lineGap: Math.max(-64, Math.min(200, lg)),
+                 letterSpacing: Math.max(-20, Math.min(40, ls)),
+                 spaceWidth: sw };
+    }
+
     function styleFromPage(el, fb) {
         el = el || {};
         var split = splitFontName(el.font);
+        var D = edims();
         var y = numOr(el.front_Y != null ? el.front_Y : el.from_Y, fb.y);
         var x = numOr(el.from_X, fb.x);
         var w = numOr(el.to_X, fb.x + fb.w) - x;
         var h = numOr(el.to_Y, fb.y + fb.h) - y;
+        var spacing = spacingFromPage(el);
         return {
             font: split.name, size: split.size,
             color: el.colour || '#DB7700',
             align: oneOf(el.align, ['left', 'center', 'right'], 'center'),
             valign: oneOf(el.valign, ['top', 'middle', 'bottom'], 'middle'),
+            lineHeight: spacing.lineHeight,
+            lineGap: spacing.lineGap,
+            letterSpacing: spacing.letterSpacing,
+            spaceWidth: spacing.spaceWidth,
             box: {
-                x: Math.max(0, Math.min(239, x)),
-                y: Math.max(0, Math.min(39, y)),
-                w: w >= 1 && w <= 240 ? w : fb.w,
-                h: h >= 1 && h <= 40 ? h : fb.h
+                x: Math.max(0, Math.min(D.w - 1, x)),
+                y: Math.max(0, Math.min(D.h - 1, y)),
+                w: w >= 1 && w <= D.w ? w : fb.w,
+                h: h >= 1 && h <= D.h ? h : fb.h
             }
         };
+    }
+
+    function imagesFromPage(page) {
+        var raw = page.images;
+        if (!Array.isArray(raw)) raw = page.bitmaps; // legacy shape
+        var out = [];
+        (raw || []).forEach(function (spec) {
+            var c = cleanImageSpec(spec);
+            if (c) out.push(c);
+        });
+        return out.slice(0, 8);
     }
 
     function draftFromPage(page) {
@@ -574,6 +1009,7 @@
             dots: true,
             outerTab: 0,
             innerTab: 0,
+            images: imagesFromPage(page || {}),
             styles: {
                 number: styleFromPage(page.number, LINK_FALLBACK_BOXES.number),
                 destination: styleFromPage(page.destination, LINK_FALLBACK_BOXES.destination),
@@ -792,11 +1228,13 @@
         // The new page inherits the current draft's route, destination and
         // styling - only the new content (usually the via) needs typing.
         var state = collectState(root);
-        var inherited = {
-            number: pageElement(state.route, state.styles.number),
-            destination: pageElement(state.destination, state.styles.destination),
-            via: pageElement('', state.styles.via)
-        };
+        var inherited = buildPage({
+            route: state.route,
+            destination: state.destination,
+            via: '',
+            styles: state.styles,
+            images: state.images
+        });
         var freshText = null;
         fetchProgram(ctx.program)
             .then(function (prog) {
@@ -840,29 +1278,37 @@
         try {
             localStorage.removeItem(STORAGE_KEY);
         } catch (err) { /* ignore */ }
+        // Reset to the user's Settings defaults (fresh-draft shape).
+        var def = defaultDraft();
         setVal(root, 'route-number', '');
         setVal(root, 'sign-destination', '');
         setVal(root, 'sign-via', '');
-        setVal(root, 'sign-layout', 'bottom');
+        setVal(root, 'sign-layout', def.layout || 'bottom');
         setVal(root, 'number-side', 'right');
         var guidesEl = $(root, 'show-guides');
         if (guidesEl) guidesEl.checked = false;
         var dotsEl = $(root, 'show-dots');
         if (dotsEl) dotsEl.checked = true;
-        applyPreset(root, 'bottom');
+        applyPreset(root, def.layout || 'bottom');
         GROUPS.forEach(function (group) {
-            var fb = DEFAULTS.styles[group.key];
+            var fb = (def.styles || {})[group.key] || DEFAULTS.styles[group.key];
             setVal(root, group.colorId, fb.color);
             setVal(root, group.alignId, fb.align);
             setVal(root, group.valignId, fb.valign);
+            setVal(root, group.lhId, '');
+            setVal(root, group.lgId, 0);
+            setVal(root, group.lsId, 0);
+            setVal(root, group.spaceId, '');
+            // Fonts + sizes resolve async; stash what to select once loaded.
             var fontEl = $(root, group.fontId);
-            if (fontEl && fontEl.options.length) fontEl.selectedIndex = 0;
+            if (fontEl) fontEl.dataset.pending = fb.font || '';
+            var sizeEl = $(root, group.sizeId);
+            if (sizeEl) sizeEl.dataset.pending = fb.size || '';
         });
-        GROUPS.forEach(function (group) {
-            loadSizes(root, group).then(function () { renderPreview(root); });
-        });
+        loadFonts(root).then(function () { renderPreview(root); save(root, false); });
         markActive(root, '.side-bar > .tabs', 0);
         markActive(root, '.sign-attributes > .tabs', 0);
+        setPageImages(root, []);
         renderPreview(root);
         setStatus(root, 'Draft cleared');
     }
@@ -908,18 +1354,15 @@
     // canvas preview shows it (same boxes, fonts, colours, alignment).
     function startBoardPreview(root) {
         var state = collectState(root);
+        var D = edims();
         previewSay(root, 'Sending to board…');
         fetch('/api/board/preview', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                page: {
-                    number: pageElement(state.route, state.styles.number),
-                    destination: pageElement(state.destination, state.styles.destination),
-                    via: pageElement(state.via, state.styles.via)
-                },
-                width: 240,
-                height: 40,
+                page: buildPage(state),
+                width: D.w,
+                height: D.h,
                 seconds: 60
             })
         })
@@ -954,10 +1397,11 @@
 
     function refresh(root) {
         var draft = loadDraft();
-        applyState(root, draft || DEFAULTS);
+        applyState(root, draft || defaultDraft());
         renderPreview(root);
         renderPageLink(root);
         renderPages(root);
+        refreshLibrary(root, true);
         loadFonts(root).then(function () {
             renderPreview(root);
             if (draft) {
@@ -987,7 +1431,13 @@
 
         root.addEventListener('input', function (event) {
             var t = event.target;
-            if (!t || !t.id) return;
+            if (!t) return;
+            // Bitmap X/Y/W/H fields have no id, only data-field.
+            if (t.dataset && t.dataset.field) {
+                scheduleSave();
+                return;
+            }
+            if (!t.id) return;
             var group = GROUPS.find(function (g) {
                 return g.fontId === t.id;
             });
@@ -1013,6 +1463,25 @@
             var clear = event.target.closest ? event.target.closest('#clear-draft') : null;
             if (clear) {
                 doClear(root);
+                return;
+            }
+            var uploadBtn = event.target.closest ? event.target.closest('#bitmap-upload') : null;
+            if (uploadBtn) {
+                uploadBitmap(root);
+                return;
+            }
+            var removeImg = event.target.closest ? event.target.closest('[data-remove-image]') : null;
+            if (removeImg) {
+                var images = readPageImages(root);
+                images.splice(parseInt(removeImg.dataset.removeImage, 10) || 0, 1);
+                setPageImages(root, images);
+                renderPreview(root);
+                save(root);
+                return;
+            }
+            var stepBtn = event.target.closest ? event.target.closest('[data-size-step]') : null;
+            if (stepBtn) {
+                stepSize(root, stepBtn, scheduleSave);
                 return;
             }
             var shiftPageBtn = event.target.closest ? event.target.closest('#pages-list [data-shift-page]') : null;

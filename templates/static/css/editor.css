@@ -73,23 +73,79 @@
 
 /* Per-element position controls */
 .pos {
-    margin-top: 1rem;
+    margin-top: 0.6rem;
 }
 
 .pos h3 {
-    margin: 0 0 0.4rem;
-    font-size: 0.85rem;
+    margin: 0 0 0.25rem;
+    font-size: 0.75rem;
     color: var(--muted, #a7a7b3);
 }
 
 .pos-grid {
     display: grid;
+    gap: 0.3rem 0.4rem;
+}
+
+.pos-grid.coords {
+    grid-template-columns: repeat(4, 1fr);
+}
+
+.pos-grid.aligns {
     grid-template-columns: 1fr 1fr;
-    gap: 0.4rem 0.6rem;
+    margin-top: 0.3rem;
+}
+
+.pos-grid.spacing {
+    grid-template-columns: repeat(3, 1fr);
+    margin-top: 0.3rem;
 }
 
 .pos-grid label {
-    margin: 0;
+    margin: 0 0 0.1rem;
+    font-size: 0.72rem;
+}
+
+.pos-grid input[type="number"],
+.pos-grid select {
+    min-height: 36px;
+    padding: 0.3rem 0.5rem;
+}
+
+.pos-grid select {
+    padding-right: 1.5rem;
+    background-position: right 0.45rem center;
+}
+
+@media (max-width: 380px) {
+    .pos-grid.coords {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+/* Font + size share one row while there is room. */
+.font-row {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 0.4rem;
+    align-items: end;
+}
+
+.font-row label {
+    margin: 0.35rem 0 0.15rem;
+    font-size: 0.75rem;
+}
+
+.font-row select {
+    min-height: 38px;
+    padding-top: 0.35rem;
+    padding-bottom: 0.35rem;
+}
+
+@media (max-width: 380px) {
+    .font-row {
+        grid-template-columns: 1fr;
+    }
 }
 
 /* Container colour coding matches the guide outlines on the preview */
@@ -103,6 +159,40 @@
 
 .pos-via h3 {
     color: #46c46a;
+}
+
+/* Compact element panels (Number / Destination / Via): tighter labels,
+   shorter fields, inline colour row, compact size stepper. */
+.sign-attributes .tabs {
+    margin-top: 0.5rem;
+}
+
+.sign-attributes .tab-page {
+    padding-top: 0.25rem;
+}
+
+.sign-attributes .tab-page > label {
+    margin: 0.35rem 0 0.15rem;
+    font-size: 0.75rem;
+}
+
+.sign-attributes .tab-page > select {
+    min-height: 38px;
+    padding-top: 0.35rem;
+    padding-bottom: 0.35rem;
+}
+
+.sign-attributes label[for$="-color"] {
+    display: inline-block;
+    vertical-align: middle;
+    margin: 0.4rem 0.5rem 0.15rem 0;
+}
+
+.sign-attributes input[type="color"] {
+    display: inline-block;
+    vertical-align: middle;
+    width: 2.75rem;
+    height: 1.9rem;
 }
 
 /* Program tab: 50/50 two-column layout, stacking on mobile. Flat, no cards. */
@@ -315,6 +405,200 @@
 
 #pages-list {
   margin-bottom: 10px;
+}
+
+/* Bitmaps tab: upload + library + per-page positioning. */
+.bitmap-upload {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.6rem;
+}
+
+.bitmap-upload input[type="file"] {
+    flex: 1 1 180px;
+    min-width: 0;
+}
+
+#bitmap-library {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.bitmap-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 4px;
+    background: transparent;
+    border: 1px solid var(--border, #2c2c33);
+    border-radius: 8px;
+    font: inherit;
+}
+
+.bitmap-cell img {
+    width: 100%;
+    height: 44px;
+    object-fit: contain;
+    background: #000;
+    border-radius: 4px;
+    image-rendering: pixelated;
+}
+
+.bitmap-cell span {
+    font-size: 0.7rem;
+    color: var(--muted, #a7a7b3);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.bitmap-cell .row {
+    display: flex;
+    gap: 0.3rem;
+}
+
+.bitmap-cell .row button {
+    flex: 1;
+    min-height: 32px;
+    padding: 0.2rem 0.4rem;
+    background: transparent;
+    color: var(--text, #f2f2f4);
+    border: 1px solid var(--border, #2c2c33);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.75rem;
+}
+
+.bitmap-cell .row button:hover {
+    border-color: var(--accent, #DB7700);
+}
+
+.bitmap-cell .row button.danger {
+    color: var(--danger, #e5484d);
+}
+
+.page-image {
+    border-top: 1px solid var(--border, #2c2c33);
+    padding: 0.5rem 0;
+    display: grid;
+    gap: 0.4rem;
+}
+
+.page-image .head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+}
+
+.page-image .head img {
+    width: 48px;
+    height: 24px;
+    object-fit: contain;
+    background: #000;
+    border: 1px solid var(--border, #2c2c33);
+    border-radius: 4px;
+    image-rendering: pixelated;
+}
+
+.page-image .head button {
+    margin-left: auto;
+    background: transparent;
+    color: var(--danger, #e5484d);
+    border: 1px solid var(--border, #2c2c33);
+    border-radius: 6px;
+    cursor: pointer;
+    padding: 0.25rem 0.6rem;
+    font: inherit;
+    font-size: 0.8rem;
+}
+
+.page-image .grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.4rem;
+}
+
+.page-image .grid label {
+    margin: 0;
+    font-size: 0.8rem;
+    display: grid;
+    gap: 2px;
+}
+
+/* Font-size stepper: − select + in one row. */
+.size-step {
+    display: flex;
+    gap: 0.3rem;
+    align-items: stretch;
+}
+
+.size-step select {
+    flex: 1;
+    min-width: 0;
+    min-height: 38px;
+    padding-top: 0.35rem;
+    padding-bottom: 0.35rem;
+}
+
+.size-step button {
+    flex-shrink: 0;
+    min-width: 38px;
+    min-height: 38px;
+    padding: 0.2rem 0.5rem;
+    background: transparent;
+    color: var(--text, #f2f2f4);
+    border: 1px solid var(--border, #2c2c33);
+    border-radius: 8px;
+    cursor: pointer;
+    font: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1;
+}
+
+.size-step button:hover {
+    border-color: var(--accent, #DB7700);
+}
+
+/* Settings tab. */
+.settings h2 {
+    font-size: 1.1rem;
+    margin: 0 0 0.25rem;
+}
+
+.set-fonts {
+    display: grid;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+}
+
+.set-font-row {
+    display: grid;
+    grid-template-columns: 110px 1fr 90px;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.set-font-row span {
+    font-size: 0.9rem;
+}
+
+.set-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 1rem;
+}
+
+@media (max-width: 700px) {
+    .set-font-row {
+        grid-template-columns: 1fr;
+    }
 }
 
 @media (max-width: 700px) {

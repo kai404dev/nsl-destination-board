@@ -28,11 +28,22 @@
         return root.querySelector('#' + id);
     }
 
+    function defaultColour() {
+        try {
+            if (window.NSLSettings) {
+                var c = window.NSLSettings.get().colour;
+                if (/^#[0-9a-fA-F]{6}$/.test(c)) return c;
+            }
+        } catch (err) { /* ignore */ }
+        return '#DB7700';
+    }
+
     function blankElements() {
+        var colour = defaultColour();
         return {
-            number: { text: '', font: 'johnston100-45', colour: '#DB7700', from_X: 180, to_X: 240, front_Y: 0, to_Y: 40, align: 'center', valign: 'middle' },
-            destination: { text: '', font: 'johnston100-33', colour: '#DB7700', from_X: 0, to_X: 180, front_Y: 0, to_Y: 25, align: 'center', valign: 'middle' },
-            via: { text: '', font: 'johnston100-18', colour: '#DB7700', from_X: 0, to_X: 180, front_Y: 25, to_Y: 40, align: 'center', valign: 'middle' }
+            number: { text: '', font: 'johnston100-45', colour: colour, from_X: 180, to_X: 240, front_Y: 0, to_Y: 40, align: 'center', valign: 'middle' },
+            destination: { text: '', font: 'johnston100-33', colour: colour, from_X: 0, to_X: 180, front_Y: 0, to_Y: 25, align: 'center', valign: 'middle' },
+            via: { text: '', font: 'johnston100-18', colour: colour, from_X: 0, to_X: 180, front_Y: 25, to_Y: 40, align: 'center', valign: 'middle' }
         };
     }
 
@@ -376,7 +387,7 @@
             var parsed = parseInt(v, 10);
             return isNaN(parsed) ? fallback : parsed;
         }
-        return {
+        var out = {
             text: clearText ? '' : (el.text || ''),
             font: el.font || fb.font,
             colour: el.colour || fb.colour,
@@ -387,6 +398,22 @@
             align: oneOf(el.align, ['left', 'center', 'right'], 'center'),
             valign: oneOf(el.valign, ['top', 'middle', 'bottom'], 'middle')
         };
+        var lh = parseInt(el.line_height, 10);
+        if (!isNaN(lh) && lh >= 1 && lh <= 256) out.line_height = lh;
+        var lg = parseInt(el.line_gap, 10);
+        if (!isNaN(lg) && lg !== 0) {
+            out.line_gap = Math.max(-64, Math.min(200, lg));
+        }
+        var ls = parseInt(el.letter_spacing, 10);
+        if (!isNaN(ls) && ls !== 0) {
+            out.letter_spacing = Math.max(-20, Math.min(40, ls));
+        }
+        var sw = (el.space_width === undefined || el.space_width === null || el.space_width === '')
+            ? null : parseInt(el.space_width, 10);
+        if (sw !== null && !isNaN(sw)) {
+            out.space_width = Math.max(0, Math.min(64, sw));
+        }
+        return out;
     }
 
     // New pages inherit the last page's route, destination and styling so
@@ -394,11 +421,15 @@
     function carryPage(template) {
         var fb = blankElements();
         if (!template) return fb;
-        return {
+        var page = {
             number: carryElement(template.number, fb.number, false),
             destination: carryElement(template.destination, fb.destination, false),
             via: carryElement(template.via, fb.via, true)
         };
+        if (Array.isArray(template.images)) {
+            page.images = JSON.parse(JSON.stringify(template.images)).slice(0, 8);
+        }
+        return page;
     }
 
     function addPage(root, service, destinationName) {
@@ -624,11 +655,24 @@
         function styleOf(el, fb) {
             el = el || {};
             var split = splitFont(el.font);
+            var lh = parseInt(el.line_height, 10);
+            if (isNaN(lh) || lh < 1 || lh > 256) lh = null;
+            var lg = parseInt(el.line_gap, 10);
+            if (isNaN(lg)) lg = 0;
+            var ls = parseInt(el.letter_spacing, 10);
+            if (isNaN(ls)) ls = 0;
+            var sw = (el.space_width === undefined || el.space_width === null || el.space_width === '')
+                ? null : parseInt(el.space_width, 10);
+            if (sw !== null && (isNaN(sw) || sw < 0 || sw > 64)) sw = null;
             return {
                 font: split.name, size: split.size,
                 color: el.colour || '#DB7700',
                 align: oneOf(el.align, ['left', 'center', 'right'], 'center'),
                 valign: oneOf(el.valign, ['top', 'middle', 'bottom'], 'middle'),
+                lineHeight: lh,
+                lineGap: Math.max(-64, Math.min(200, lg)),
+                letterSpacing: Math.max(-20, Math.min(40, ls)),
+                spaceWidth: sw,
                 box: boxOf(el, fb)
             };
         }
@@ -642,6 +686,8 @@
             dots: true,
             outerTab: 0,
             innerTab: 0,
+            images: Array.isArray(page.images)
+                ? JSON.parse(JSON.stringify(page.images)).slice(0, 8) : [],
             styles: {
                 number: styleOf(page.number, FALLBACK_BOXES.number),
                 destination: styleOf(page.destination, FALLBACK_BOXES.destination),

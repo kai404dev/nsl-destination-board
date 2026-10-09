@@ -53,9 +53,26 @@ sudo .venv/bin/python main.py --portal --board
 
 Text pages render with the same BDF fonts, boxes (`from_X`/`to_X`/
 `front_Y`/`to_Y`), alignment and colours as the Sign Studio preview.
+Multi-line text (Enter in the Via box) stacks rows at the font's
+natural line height; per-element `line_height` (explicit row height in
+px, empty = auto) and `line_gap` (extra px between rows, negative
+tightens) adjust it in the Editor's Line H / Gap fields, on the canvas
+preview and on the panels alike. `letter_spacing` (Editor's Letter
+field, px added after every character, negative tightens) adjusts
+tracking per element the same way.
 Destinations with a `bitmaps` list show each PNG fullscreen (240x40)
 for the same `rotation_speed` timing. Bitmaps live under `bitmaps/`
 and are referenced by repo-relative paths in the `.dest` file.
+Text pages can also carry positioned overlays:
+`"images": [{"src": "bitmaps/shared/logo.png", "x": 0, "y": 0}]`
+(`x`/`y` = top-left corner, optional `w`/`h` to resize, max 8 per
+page). Upload PNG/JPG/GIF files in Sign Studio → Editor → Bitmaps,
+then Place them and set X/Y/W/H — the canvas preview, board preview
+and LED output all match. Each Size selector has −/+ buttons stepping
+through that font's available sizes. The **Settings** tab (stored in
+this browser) sets the display size driving the Editor canvas, plus
+your default colour, layout and per-element fonts/sizes for fresh
+drafts and new pages.
 
 ### Choosing what plays (Controller tab)
 

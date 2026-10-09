@@ -227,10 +227,12 @@
             })
             .then(function (sizes) {
                 sizeSel.innerHTML = '';
+                // WxH bitmap families (e.g. 10x20): show the family name.
+                var showName = sizes.length === 1 && /^\d+x\d+[a-z]*$/i.test(S.font || '');
                 sizes.forEach(function (size) {
                     var opt = document.createElement('option');
                     opt.value = String(size);
-                    opt.textContent = String(size);
+                    opt.textContent = showName ? S.font : String(size);
                     sizeSel.appendChild(opt);
                 });
                 if (!sizes.length) throw new Error('no sizes');

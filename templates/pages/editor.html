@@ -11,6 +11,9 @@
                 <button>Design</button>
             </div>
             <div class="tab">
+                <button>Bitmaps</button>
+            </div>
+            <div class="tab">
                 <button>Pages</button>
             </div>
             <div class="tab">
@@ -54,113 +57,247 @@
                         </div>
                         <div class="tab-pages">
                             <div class="tab-page" id="number">
-                                <label for="number-font">Font</label>
-                                <select id="number-font">
-                                    <option>Loading fonts…</option>
-                                </select>
-                                <label for="number-size">Size</label>
-                                <select id="number-size">
-                                    <option>Select a font first</option>
-                                </select>
+                                <div class="font-row">
+                                    <div class="font-name">
+                                        <label for="number-font">Font</label>
+                                        <select id="number-font">
+                                            <option>Loading fonts…</option>
+                                        </select>
+                                    </div>
+                                    <div class="font-size">
+                                        <label for="number-size">Size</label>
+                                        <div class="size-step">
+                                            <button type="button" data-size-step="-1" data-size-target="number-size" aria-label="Smaller number size">−</button>
+                                            <select id="number-size">
+                                                <option>Select a font first</option>
+                                            </select>
+                                            <button type="button" data-size-step="1" data-size-target="number-size" aria-label="Larger number size">+</button>
+                                        </div>
+                                    </div>
+                                </div>
                                 <label for="number-color">Colour</label>
                                 <input type="color" id="number-color" value="#DB7700">
                                 <div class="pos pos-number">
                                     <h3>Position</h3>
-                                    <div class="pos-grid">
-                                        <label>X<input type="number" id="number-x" min="0" max="240"></label>
-                                        <label>Y<input type="number" id="number-y" min="0" max="40"></label>
-                                        <label>W<input type="number" id="number-w" min="1" max="240"></label>
-                                        <label>H<input type="number" id="number-h" min="1" max="40"></label>
-                                        <label>Align
+                                    <div class="pos-grid coords">
+                                        <div>
+                                            <label for="number-x">X</label>
+                                            <input type="number" id="number-x" min="0" max="240">
+                                        </div>
+                                        <div>
+                                            <label for="number-y">Y</label>
+                                            <input type="number" id="number-y" min="0" max="40">
+                                        </div>
+                                        <div>
+                                            <label for="number-w">W</label>
+                                            <input type="number" id="number-w" min="1" max="240">
+                                        </div>
+                                        <div>
+                                            <label for="number-h">H</label>
+                                            <input type="number" id="number-h" min="1" max="40">
+                                        </div>
+                                    </div>
+                                    <div class="pos-grid aligns">
+                                        <div>
+                                            <label for="number-align">Align</label>
                                             <select id="number-align">
                                                 <option value="left">Left</option>
                                                 <option value="center" selected>Center</option>
                                                 <option value="right">Right</option>
                                             </select>
-                                        </label>
-                                        <label>Valign
+                                        </div>
+                                        <div>
+                                            <label for="number-valign">Valign</label>
                                             <select id="number-valign">
                                                 <option value="top">Top</option>
                                                 <option value="middle" selected>Middle</option>
                                                 <option value="bottom">Bottom</option>
                                             </select>
-                                        </label>
+                                        </div>
+                                    </div>
+                                    <div class="pos-grid spacing">
+                                        <div>
+                                            <label for="number-lh">Line H</label>
+                                            <input type="number" id="number-lh" min="1" max="256" placeholder="auto">
+                                        </div>
+                                        <div>
+                                            <label for="number-ls">Letter</label>
+                                            <input type="number" id="number-ls" min="-20" max="40" placeholder="0">
+                                        </div>
+                                        <div>
+                                            <label for="number-sp">Space</label>
+                                            <input type="number" id="number-sp" min="0" max="64" placeholder="auto">
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                             <div class="tab-page" id="destination">
-                                <label for="dest-font">Font</label>
-                                <select id="dest-font">
-                                    <option>Loading fonts…</option>
-                                </select>
-                                <label for="dest-size">Size</label>
-                                <select id="dest-size">
-                                    <option>Select a font first</option>
-                                </select>
+                                <div class="font-row">
+                                    <div class="font-name">
+                                        <label for="dest-font">Font</label>
+                                        <select id="dest-font">
+                                            <option>Loading fonts…</option>
+                                        </select>
+                                    </div>
+                                    <div class="font-size">
+                                        <label for="dest-size">Size</label>
+                                        <div class="size-step">
+                                            <button type="button" data-size-step="-1" data-size-target="dest-size" aria-label="Smaller destination size">−</button>
+                                            <select id="dest-size">
+                                                <option>Select a font first</option>
+                                            </select>
+                                            <button type="button" data-size-step="1" data-size-target="dest-size" aria-label="Larger destination size">+</button>
+                                        </div>
+                                    </div>
+                                </div>
                                 <label for="dest-color">Colour</label>
                                 <input type="color" id="dest-color" value="#DB7700">
                                 <div class="pos pos-destination">
                                     <h3>Position</h3>
-                                    <div class="pos-grid">
-                                        <label>X<input type="number" id="dest-x" min="0" max="240"></label>
-                                        <label>Y<input type="number" id="dest-y" min="0" max="40"></label>
-                                        <label>W<input type="number" id="dest-w" min="1" max="240"></label>
-                                        <label>H<input type="number" id="dest-h" min="1" max="40"></label>
-                                        <label>Align
+                                    <div class="pos-grid coords">
+                                        <div>
+                                            <label for="dest-x">X</label>
+                                            <input type="number" id="dest-x" min="0" max="240">
+                                        </div>
+                                        <div>
+                                            <label for="dest-y">Y</label>
+                                            <input type="number" id="dest-y" min="0" max="40">
+                                        </div>
+                                        <div>
+                                            <label for="dest-w">W</label>
+                                            <input type="number" id="dest-w" min="1" max="240">
+                                        </div>
+                                        <div>
+                                            <label for="dest-h">H</label>
+                                            <input type="number" id="dest-h" min="1" max="40">
+                                        </div>
+                                    </div>
+                                    <div class="pos-grid aligns">
+                                        <div>
+                                            <label for="dest-align">Align</label>
                                             <select id="dest-align">
                                                 <option value="left">Left</option>
                                                 <option value="center" selected>Center</option>
                                                 <option value="right">Right</option>
                                             </select>
-                                        </label>
-                                        <label>Valign
+                                        </div>
+                                        <div>
+                                            <label for="dest-valign">Valign</label>
                                             <select id="dest-valign">
                                                 <option value="top">Top</option>
                                                 <option value="middle" selected>Middle</option>
                                                 <option value="bottom">Bottom</option>
                                             </select>
-                                        </label>
+                                        </div>
+                                    </div>
+                                    <div class="pos-grid spacing">
+                                        <div>
+                                            <label for="dest-lh">Line H</label>
+                                            <input type="number" id="dest-lh" min="1" max="256" placeholder="auto">
+                                        </div>
+                                        <div>
+                                            <label for="dest-ls">Letter</label>
+                                            <input type="number" id="dest-ls" min="-20" max="40" placeholder="0">
+                                        </div>
+                                        <div>
+                                            <label for="dest-sp">Space</label>
+                                            <input type="number" id="dest-sp" min="0" max="64" placeholder="auto">
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                             <div class="tab-page" id="via">
-                                <label for="via-font">Font</label>
-                                <select id="via-font">
-                                    <option>Loading fonts…</option>
-                                </select>
-                                <label for="via-size">Size</label>
-                                <select id="via-size">
-                                    <option>Select a font first</option>
-                                </select>
+                                <div class="font-row">
+                                    <div class="font-name">
+                                        <label for="via-font">Font</label>
+                                        <select id="via-font">
+                                            <option>Loading fonts…</option>
+                                        </select>
+                                    </div>
+                                    <div class="font-size">
+                                        <label for="via-size">Size</label>
+                                        <div class="size-step">
+                                            <button type="button" data-size-step="-1" data-size-target="via-size" aria-label="Smaller via size">−</button>
+                                            <select id="via-size">
+                                                <option>Select a font first</option>
+                                            </select>
+                                            <button type="button" data-size-step="1" data-size-target="via-size" aria-label="Larger via size">+</button>
+                                        </div>
+                                    </div>
+                                </div>
                                 <label for="via-color">Colour</label>
                                 <input type="color" id="via-color" value="#DB7700">
                                 <div class="pos pos-via">
                                     <h3>Position</h3>
-                                    <div class="pos-grid">
-                                        <label>X<input type="number" id="via-x" min="0" max="240"></label>
-                                        <label>Y<input type="number" id="via-y" min="0" max="40"></label>
-                                        <label>W<input type="number" id="via-w" min="1" max="240"></label>
-                                        <label>H<input type="number" id="via-h" min="1" max="40"></label>
-                                        <label>Align
+                                    <div class="pos-grid coords">
+                                        <div>
+                                            <label for="via-x">X</label>
+                                            <input type="number" id="via-x" min="0" max="240">
+                                        </div>
+                                        <div>
+                                            <label for="via-y">Y</label>
+                                            <input type="number" id="via-y" min="0" max="40">
+                                        </div>
+                                        <div>
+                                            <label for="via-w">W</label>
+                                            <input type="number" id="via-w" min="1" max="240">
+                                        </div>
+                                        <div>
+                                            <label for="via-h">H</label>
+                                            <input type="number" id="via-h" min="1" max="40">
+                                        </div>
+                                    </div>
+                                    <div class="pos-grid aligns">
+                                        <div>
+                                            <label for="via-align">Align</label>
                                             <select id="via-align">
                                                 <option value="left">Left</option>
                                                 <option value="center" selected>Center</option>
                                                 <option value="right">Right</option>
                                             </select>
-                                        </label>
-                                        <label>Valign
+                                        </div>
+                                        <div>
+                                            <label for="via-valign">Valign</label>
                                             <select id="via-valign">
                                                 <option value="top">Top</option>
                                                 <option value="middle" selected>Middle</option>
                                                 <option value="bottom">Bottom</option>
                                             </select>
-                                        </label>
+                                        </div>
+                                    </div>
+                                    <div class="pos-grid spacing">
+                                        <div>
+                                            <label for="via-lh">Line H</label>
+                                            <input type="number" id="via-lh" min="1" max="256" placeholder="auto">
+                                        </div>
+                                        <div>
+                                            <label for="via-ls">Letter</label>
+                                            <input type="number" id="via-ls" min="-20" max="40" placeholder="0">
+                                        </div>
+                                        <div>
+                                            <label for="via-sp">Space</label>
+                                            <input type="number" id="via-sp" min="0" max="64" placeholder="auto">
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
+            </div>
+            <div class="tab-page" id="bitmaps">
+                <h2>Bitmaps</h2>
+                <p class="muted">Upload a PNG/JPG, then place it on this page. X/Y is the
+                    top-left corner in pixels (240×40); W/H resize it, empty keeps its size.</p>
+                <div class="bitmap-upload">
+                    <input type="file" id="bitmap-file" accept=".png,.jpg,.jpeg,.bmp,.gif,image/png,image/jpeg,image/gif,image/bmp">
+                    <button id="bitmap-upload" class="btn-primary" type="button">Upload</button>
+                    <span class="bitmap-upload-status muted" id="bitmap-upload-status"></span>
+                </div>
+                <h3>Library</h3>
+                <div id="bitmap-library"><p class="muted">Loading…</p></div>
+                <h3>On this page</h3>
+                <div id="page-images"></div>
             </div>
             <div class="tab-page" id="pages">
                 <h2>Pages</h2>

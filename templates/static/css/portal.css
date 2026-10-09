@@ -160,6 +160,7 @@ label {
 }
 
 input[type="text"],
+input[type="number"],
 select,
 textarea {
     width: 100%;
@@ -173,6 +174,7 @@ textarea {
 }
 
 input[type="text"]:focus,
+input[type="number"]:focus,
 select:focus,
 textarea:focus {
     outline: none;

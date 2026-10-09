@@ -119,15 +119,27 @@ def load_font(fonts_dir: Path, name: str, size: str) -> dict | None:
     key = f"{name}-{size}"
     if key in _font_cache:
         return _font_cache[key]
-    if not name or not str(size).isdigit():
+    import re as _re
+    if not name or not _re.fullmatch(r"[A-Za-z0-9]+", str(size or "")):
         _font_cache[key] = None
         return None
-    path = fonts_dir / name / f"{key}.bdf"
+    candidates = [fonts_dir / name / f"{key}.bdf"]
     try:
-        resolved = path.resolve()
-        resolved.relative_to(fonts_dir.resolve())
-        text = resolved.read_text(encoding="utf-8")
-    except OSError:
+        # Fallback: any *-<size>.bdf in the folder (covers misnamed files
+        # such as HaxorNarrow-15.bdf inside HaxorMedium/).
+        candidates += sorted((fonts_dir / name).glob(f"*-{int(size)}.bdf"))
+    except (OSError, ValueError):
+        pass
+    text = None
+    for path in candidates:
+        try:
+            resolved = path.resolve()
+            resolved.relative_to(fonts_dir.resolve())
+            text = resolved.read_text(encoding="utf-8")
+            break
+        except OSError:
+            continue
+    if text is None:
         _font_cache[key] = None
         return None
     font = parse_bdf(text)
@@ -185,17 +197,41 @@ def _one_of(value: str, allowed: tuple[str, ...], fallback: str) -> str:
     return value if value in allowed else fallback
 
 
-def measure_string(font: dict, s: str) -> dict:
+def _letter_spacing(el: dict | None) -> int:
+    """Resolve an element's letter spacing (tracking) in px, default 0."""
+    try:
+        tracking = int((el or {}).get("letter_spacing", 0))
+    except (TypeError, ValueError):
+        return 0
+    return max(-20, min(40, tracking))
+
+
+def _space_width(el: dict | None) -> int | None:
+    """Resolve an element's explicit space width in px, None = font default."""
+    try:
+        raw = (el or {}).get("space_width")
+        sw = None if raw in (None, "") else int(raw)
+    except (TypeError, ValueError):
+        return None
+    if sw is None:
+        return None
+    return max(0, min(64, sw))
+
+
+def measure_string(font: dict, s: str, tracking: int = 0, space_w: int | None = None) -> dict:
     width = 0
     top = 0
     bottom = 0
     has_ink = False
     for ch in s:
+        if ord(ch) == 32 and space_w is not None:
+            width += space_w + tracking  # explicit space width wins over the font
+            continue
         g = font["glyphs"].get(ord(ch))
         if g is None:
-            width += MISSING_ADVANCE
+            width += MISSING_ADVANCE + tracking
             continue
-        width += g["dw"] or g["w"]
+        width += (g["dw"] or g["w"]) + tracking
         if g["rows"]:
             has_ink = True
             if g["yoff"] + g["h"] > top:
@@ -209,12 +245,16 @@ def measure_string(font: dict, s: str) -> dict:
 
 
 def _draw_line(px, W: int, H: int, font: dict, line: str,
-               x: int, baseline: int, colour, clip: dict) -> int:
+               x: int, baseline: int, colour, clip: dict, tracking: int = 0,
+               space_w: int | None = None) -> int:
     pen = x
     for ch in line:
+        if ord(ch) == 32 and space_w is not None:
+            pen += space_w + tracking  # explicit space width, no ink
+            continue
         g = font["glyphs"].get(ord(ch))
         if g is None:
-            pen += MISSING_ADVANCE
+            pen += MISSING_ADVANCE + tracking
             continue
         for r, bits in enumerate(g["rows"]):
             y = baseline - g["yoff"] - g["h"] + r
@@ -225,17 +265,48 @@ def _draw_line(px, W: int, H: int, font: dict, line: str,
                             and clip["y"] <= yy < clip["y"] + clip["h"]
                             and 0 <= xx < W and 0 <= yy < H):
                         px[xx, yy] = colour
-        pen += g["dw"] or g["w"]
+        pen += (g["dw"] or g["w"]) + tracking
     return pen - x
 
 
+def _line_spacing(el: dict, font: dict, measures: list) -> tuple[int, int, int]:
+    """Resolve multi-line row geometry for one element.
+
+    Returns (base, step, ascent): *base* is the row height (explicit
+    ``line_height`` or the font's ascent+descent), *step* is the baseline
+    pitch (base plus ``line_gap``), and *ascent* anchors the first row.
+    Missing/invalid values fall back to the font default and zero gap.
+    """
+    el = el or {}
+    ascent = font.get("ascent") or 0
+    descent = font.get("descent") or 0
+    natural = ascent + descent
+    if not natural:
+        natural = max([m["top"] - m["bottom"] for m in measures] or [0]) or 8
+        if not ascent:
+            ascent = max([m["top"] for m in measures] or [0]) or natural
+    try:
+        explicit = int(el.get("line_height")) if el.get("line_height") not in (None, "") else None
+    except (TypeError, ValueError):
+        explicit = None
+    base = explicit if explicit is not None and 1 <= explicit <= 256 else natural
+    try:
+        gap = int(el.get("line_gap", 0))
+    except (TypeError, ValueError):
+        gap = 0
+    gap = max(-64, min(200, gap))
+    return base, max(1, base + gap), ascent
+
+
 def _draw_string(px, W: int, H: int, font: dict, s: str,
-                 box: dict, align: str, valign: str, colour) -> None:
+                 box: dict, align: str, valign: str, colour, el: dict | None = None) -> None:
     if not s:
         return
+    tracking = _letter_spacing(el)
+    space_w = _space_width(el)
     lines = str(s).split("\n")
     if len(lines) <= 1:
-        m = measure_string(font, s)
+        m = measure_string(font, s, tracking, space_w)
         x = box["x"]
         if align == "center":
             x = _round_half_up(box["x"] + (box["w"] - m["width"]) / 2)
@@ -247,19 +318,13 @@ def _draw_string(px, W: int, H: int, font: dict, s: str,
         elif valign == "middle":
             baseline = _round_half_up(
                 box["y"] + box["h"] / 2 + (m["top"] + m["bottom"]) / 2)
-        _draw_line(px, W, H, font, s, x, baseline, colour, box)
+        _draw_line(px, W, H, font, s, x, baseline, colour, box, tracking, space_w)
         return
-    # Multi-line: stack rows using ascent/descent (Enter in Via box).
-    measures = [measure_string(font, ln) for ln in lines]
-    ascent = font.get("ascent") or 0
-    descent = font.get("descent") or 0
-    line_height = ascent + descent
-    if not line_height:
-        max_ink = max([m["top"] - m["bottom"] for m in measures] or [0])
-        line_height = max_ink or 8
-        if not ascent:
-            ascent = max([m["top"] for m in measures] or [0]) or line_height
-    total_h = line_height * len(lines)
+    # Multi-line: stack rows using ascent/descent (Enter in Via box),
+    # adjusted by the element's line_height/line_gap overrides.
+    measures = [measure_string(font, ln, tracking, space_w) for ln in lines]
+    base, step, ascent = _line_spacing(el, font, measures)
+    total_h = step * (len(lines) - 1) + base
     start_y = _round_half_up(box["y"] + box["h"] - total_h)
     if valign == "top":
         start_y = _round_half_up(box["y"])
@@ -273,7 +338,72 @@ def _draw_string(px, W: int, H: int, font: dict, s: str,
         elif align == "right":
             lx = _round_half_up(box["x"] + box["w"] - w)
         _draw_line(px, W, H, font, ln, lx,
-                   start_y + ascent + i * line_height, colour, box)
+                   start_y + ascent + i * step, colour, box, tracking, space_w)
+
+
+def _resolve_page_image(src: str) -> Path | None:
+    """Resolve a page image src to a readable file, or None."""
+    s = str(src or "").strip().replace("\\", "/").lstrip("/")
+    if not s:
+        return None
+    if s.startswith("/"):
+        p = Path(s)
+        return p if p.is_file() else None
+    try:
+        p = (ROOT / s).resolve()
+        p.relative_to(ROOT.resolve())
+    except (OSError, ValueError):
+        return None
+    return p if p.is_file() else None
+
+
+def _draw_page_images(img, page: dict) -> None:
+    """Paste positioned bitmaps over a rendered text page (in order)."""
+    images = (page or {}).get("images")
+    if not isinstance(images, list) or not images:
+        # Backwards compat: a page-level "bitmaps" list of dicts.
+        legacy = (page or {}).get("bitmaps")
+        images = legacy if isinstance(legacy, list) and legacy and isinstance(legacy[0], dict) else []
+        if not images:
+            return
+    for spec in images[:8]:
+        if not isinstance(spec, dict):
+            continue
+        path = _resolve_page_image(spec.get("src"))
+        if path is None:
+            continue
+        try:
+            x = int(spec.get("x", 0))
+        except (TypeError, ValueError):
+            x = 0
+        try:
+            y = int(spec.get("y", 0))
+        except (TypeError, ValueError):
+            y = 0
+        w = spec.get("w")
+        h = spec.get("h")
+        try:
+            from PIL import Image as _I
+
+            overlay = _I.open(path)
+            has_alpha = overlay.mode in ("RGBA", "LA", "PA")
+            overlay = overlay.convert("RGBA" if has_alpha else "RGB")
+            if w is not None or h is not None:
+                try:
+                    tw = int(w) if w is not None else overlay.width
+                    th = int(h) if h is not None else overlay.height
+                except (TypeError, ValueError):
+                    tw, th = overlay.width, overlay.height
+                tw = max(1, min(1024, tw))
+                th = max(1, min(1024, th))
+                if (tw, th) != overlay.size:
+                    overlay = overlay.resize((tw, th), _I.NEAREST)
+            if has_alpha:
+                img.paste(overlay, (x, y), overlay)
+            else:
+                img.paste(overlay.convert("RGB"), (x, y))
+        except Exception:
+            continue
 
 
 def render_text_page(page: dict, W: int = 240, H: int = 40,
@@ -298,7 +428,8 @@ def render_text_page(page: dict, W: int = 240, H: int = 40,
         align = _one_of(el.get("align"), ("left", "center", "right"), "center")
         valign = _one_of(el.get("valign"), ("top", "middle", "bottom"), "middle")
         _draw_string(px, W, H, font, text, box, align, valign,
-                     parse_colour(el.get("colour")))
+                     parse_colour(el.get("colour")), el)
+    _draw_page_images(img, page)
     return img
 
 

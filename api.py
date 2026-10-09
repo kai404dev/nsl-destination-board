@@ -39,20 +39,47 @@ def font_dir(fonts_dir: Path, name: str) -> Path | None:
     return resolved
 
 
-def list_sizes(fonts_dir: Path, name: str) -> list[int] | None:
-    """Return sorted point sizes for a font, or None if the font is unknown.
+SIZE_TOKEN_RE = re.compile(r"[A-Za-z0-9]+")
 
-    Sizes are parsed from the ``<name>-<size>.bdf`` filename suffix.
+
+def is_size_token(size) -> bool:
+    """True for safe font-size tokens (digits, or names like ``6x13``).
+
+    Tokens are alphanumerics only, so they can never escape the font
+    folder via ``..`` or slashes.
+    """
+    return bool(SIZE_TOKEN_RE.fullmatch(str(size or "")))
+
+
+def _size_sort_key(size):
+    """Order sizes: plain numbers first, then WxH by height, then the rest."""
+    if isinstance(size, int):
+        return (0, size, 0, "")
+    m = re.fullmatch(r"(\d+)x(\d+)([A-Za-z]*)", str(size))
+    if m:
+        return (1, int(m.group(2)), int(m.group(1)), m.group(3))
+    return (2, 0, 0, str(size))
+
+
+def list_sizes(fonts_dir: Path, name: str) -> list | None:
+    """Return sorted size tokens for a font, or None if unknown.
+
+    Sizes are parsed from the ``*-<size>.bdf`` filename suffix - any file
+    in the folder counts. Plain numbers come back as ints, anything else
+    (e.g. the ``6x13`` entries under the ``default`` family) as strings.
+    This matches font_file(), which serves an exact ``<name>-<size>.bdf``
+    hit first and falls back to any ``*-<size>.bdf``, so every advertised
+    size is guaranteed to resolve.
     """
     directory = font_dir(fonts_dir, name)
     if directory is None:
         return None
-    sizes: set[int] = set()
+    sizes: set = set()
     for bdf in directory.glob("*.bdf"):
         _head, sep, tail = bdf.stem.rpartition("-")
-        if sep and tail.isdigit():
-            sizes.add(int(tail))
-    return sorted(sizes)
+        if sep and is_size_token(tail):
+            sizes.add(int(tail) if tail.isdigit() else tail)
+    return sorted(sizes, key=_size_sort_key)
 
 
 PROGRAM_NAME_RE = re.compile(r"[A-Za-z0-9_-]+")
@@ -99,6 +126,66 @@ def save_program(programs_dir: Path, name: str, data: dict) -> tuple[bool, str]:
         return False, "program not found"
     if not isinstance(data, dict) or not isinstance(data.get("services"), dict):
         return False, "program must be an object with a 'services' object"
+    # Normalise positioned page bitmaps + line spacing so files stay clean.
+    try:
+        for _service in (data.get("services") or {}).values():
+            if not isinstance(_service, dict):
+                continue
+            for _dest in _service.values():
+                if not isinstance(_dest, dict):
+                    continue
+                _text = _dest.get("text")
+                if not isinstance(_text, dict):
+                    continue
+                for _page in _text.values():
+                    if not isinstance(_page, dict):
+                        continue
+                    if "images" in _page:
+                        _clean = sanitise_page_images(_page.get("images"))
+                        if _clean:
+                            _page["images"] = _clean
+                        else:
+                            _page.pop("images", None)
+                    for _el in _page.values():
+                        if not isinstance(_el, dict):
+                            continue
+                        try:
+                            _lh = int(_el.get("line_height")) if _el.get("line_height") not in (None, "") else None
+                        except (TypeError, ValueError):
+                            _lh = None
+                        if _lh is None or not 1 <= _lh <= 256:
+                            _el.pop("line_height", None)
+                        else:
+                            _el["line_height"] = _lh
+                        try:
+                            _lg = int(_el.get("line_gap", 0))
+                        except (TypeError, ValueError):
+                            _lg = 0
+                        _lg = max(-64, min(200, _lg))
+                        if _lg:
+                            _el["line_gap"] = _lg
+                        else:
+                            _el.pop("line_gap", None)
+                        try:
+                            _ls = int(_el.get("letter_spacing", 0))
+                        except (TypeError, ValueError):
+                            _ls = 0
+                        _ls = max(-20, min(40, _ls))
+                        if _ls:
+                            _el["letter_spacing"] = _ls
+                        else:
+                            _el.pop("letter_spacing", None)
+                        try:
+                            _sw = _el.get("space_width")
+                            _sw = None if _sw in (None, "") else int(_sw)
+                        except (TypeError, ValueError):
+                            _sw = None
+                        if _sw is None:
+                            _el.pop("space_width", None)
+                        else:
+                            _el["space_width"] = max(0, min(64, _sw))
+    except Exception:
+        pass
     try:
         tmp = path.with_suffix(".dest.tmp")
         tmp.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
@@ -151,9 +238,14 @@ def delete_program(programs_dir: Path, name: str) -> tuple[bool, str]:
 
 
 def font_file(fonts_dir: Path, name: str, size: str) -> Path | None:
-    """Resolve ``fonts/<name>/<name>-<size>.bdf`` or None."""
+    """Resolve ``fonts/<name>/<name>-<size>.bdf`` or None.
+
+    Falls back to any ``*-<size>.bdf`` in the folder, so a misnamed file
+    (e.g. ``HaxorNarrow-15.bdf`` inside ``HaxorMedium/``) still resolves
+    instead of 404ing. *size* may be a number or a token like ``6x13``.
+    """
     directory = font_dir(fonts_dir, name)
-    if directory is None or not str(size).isdigit():
+    if directory is None or not is_size_token(size):
         return None
     candidate = directory / f"{name}-{size}.bdf"
     try:
@@ -161,7 +253,21 @@ def font_file(fonts_dir: Path, name: str, size: str) -> Path | None:
         resolved.relative_to(directory.resolve())
     except (OSError, ValueError):
         return None
-    return resolved if resolved.is_file() else None
+    if resolved.is_file():
+        return resolved
+    try:
+        fallbacks = sorted(directory.glob(f"*-{size}.bdf"))
+    except OSError:
+        return None
+    for fb in fallbacks:
+        try:
+            resolved = fb.resolve()
+            resolved.relative_to(directory.resolve())
+        except (OSError, ValueError):
+            continue
+        if resolved.is_file():
+            return resolved
+    return None
 
 
 def parse_bdf_glyphs(path: Path) -> list[dict]:
@@ -297,7 +403,12 @@ def _valid_preview_page(page) -> bool:
         el = page.get(key)
         if el is not None and not isinstance(el, dict):
             return False
-    return any((page.get(k) or {}).get("text") for k in ("number", "destination", "via"))
+    if any((page.get(k) or {}).get("text") for k in ("number", "destination", "via")):
+        return True
+    # A page with only positioned bitmaps is also previewable.
+    images = page.get("images")
+    return isinstance(images, list) and any(
+        isinstance(im, dict) and str(im.get("src") or "") for im in images)
 
 
 def set_preview(page: dict, width: int = 240, height: int = 40,
@@ -306,7 +417,7 @@ def set_preview(page: dict, width: int = 240, height: int = 40,
     import time as _time
 
     if not _valid_preview_page(page):
-        return False, "page must have number/destination/via elements with text"
+        return False, "page must have text or positioned bitmaps"
     try:
         width, height = int(width), int(height)
     except (TypeError, ValueError):
@@ -443,3 +554,193 @@ def save_selection(root: Path, program: str, service: str,
     except OSError as exc:
         return True, f"on the board now, but NOT saved for reboot: {exc}"
     return True, "saved"
+
+
+# ---------------------------------------------------------------------------
+# Bitmaps: uploadable PNG/JPG images positioned on text pages.
+#
+# Files live under ``bitmaps/shared/`` (uploads go here) plus any existing
+# ``bitmaps/programs/...`` assets. Pages reference them by repo-relative
+# POSIX path, e.g. ``{"src": "bitmaps/shared/logo.png", "x": 0, "y": 0}``.
+# ---------------------------------------------------------------------------
+
+BITMAPS_DIR_NAME = "bitmaps"
+BITMAP_UPLOAD_SUBDIR = "shared"
+BITMAP_ALLOWED_EXTS = {".png", ".jpg", ".jpeg", ".bmp", ".gif"}
+BITMAP_MAX_BYTES = 1024 * 1024  # 1 MiB decoded
+BITMAP_FILENAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
+
+
+def _bitmaps_dir(root: Path) -> Path:
+    from pathlib import Path as _P
+
+    return _P(root) / BITMAPS_DIR_NAME
+
+
+def _resolve_bitmap_rel(root: Path, rel: str) -> Path | None:
+    """Resolve a repo-relative bitmap path strictly inside *root*."""
+    from pathlib import Path as _P
+
+    if not rel or not isinstance(rel, str):
+        return None
+    # Normalise to POSIX-ish, block absolute paths and .. escapes.
+    rel = rel.strip().replace("\\", "/").lstrip("/")
+    if not rel.startswith(BITMAPS_DIR_NAME + "/"):
+        return None
+    try:
+        resolved = (_P(root) / rel).resolve()
+        resolved.relative_to(_P(root).resolve())
+        base = (_P(root) / BITMAPS_DIR_NAME).resolve()
+        resolved.relative_to(base)
+    except (OSError, ValueError):
+        return None
+    return resolved
+
+
+def list_bitmaps(root: Path) -> list[dict]:
+    """Return sorted [{path, bytes}] for every image under bitmaps/."""
+    base = _bitmaps_dir(root)
+    out: list[dict] = []
+    try:
+        files = sorted(p for p in base.rglob("*") if p.is_file())
+    except OSError:
+        return []
+    root_resolved = Path(root).resolve()
+    for p in files:
+        if p.suffix.lower() not in BITMAP_ALLOWED_EXTS:
+            continue
+        try:
+            rel = p.resolve().relative_to(root_resolved).as_posix()
+            out.append({"path": rel, "bytes": p.stat().st_size})
+        except (OSError, ValueError):
+            continue
+    return out
+
+
+def _sanitise_bitmap_filename(name: str) -> str | None:
+    base = (name or "").strip().replace("\\", "/").split("/")[-1].strip()
+    if not base or len(base) > 100:
+        return None
+    stem_end = base.rfind(".")
+    if stem_end <= 0:
+        return None
+    ext = base[stem_end:].lower()
+    if ext not in BITMAP_ALLOWED_EXTS:
+        return None
+    stem = base[:stem_end]
+    # Normalise stem: spaces -> _, drop anything unsafe.
+    stem = re.sub(r"\s+", "_", stem)
+    stem = re.sub(r"[^A-Za-z0-9._-]", "", stem).strip("._")
+    if not stem:
+        return None
+    return f"{stem}{ext}"
+
+
+def save_bitmap(root: Path, filename: str, data_b64: str) -> tuple[bool, str, str]:
+    """Decode base64 *data_b64* and store it under bitmaps/shared/.
+
+    Returns (ok, message, rel_path). Accepts raw base64 or a data-URL.
+    """
+    import base64 as _b64
+
+    clean = _sanitise_bitmap_filename(filename or "")
+    if clean is None:
+        return False, "filename must end .png/.jpg/.jpeg/.bmp/.gif (letters, digits, - _ .)", ""
+    if not data_b64 or not isinstance(data_b64, str):
+        return False, "missing image data", ""
+    payload = data_b64.strip()
+    if payload.startswith("data:"):
+        comma = payload.find(",")
+        if comma < 0:
+            return False, "bad data URL", ""
+        payload = payload[comma + 1:]
+    try:
+        raw = _b64.b64decode(payload, validate=True)
+    except Exception:
+        return False, "image data is not valid base64", ""
+    if not raw or len(raw) > BITMAP_MAX_BYTES:
+        return False, f"image must be 1 byte..{BITMAP_MAX_BYTES // 1024}KB", ""
+    # Validate it is a real image (Pillow) and normalise ext mismatch.
+    try:
+        from PIL import Image as _Image
+
+        import io as _io
+
+        with _Image.open(_io.BytesIO(raw)) as im:
+            im.verify()
+    except ImportError:
+        # Pillow unavailable (portal-only env): check magic bytes loosely.
+        png_magic = raw[:8] == b"\x89PNG\r\n\x1a\n"
+        jpg_magic = raw[:2] == b"\xff\xd8"
+        gif_magic = raw[:6] in (b"GIF87a", b"GIF89a")
+        bmp_magic = raw[:2] == b"BM"
+        if not (png_magic or jpg_magic or gif_magic or bmp_magic):
+            return False, "not a recognised image", ""
+    except Exception:
+        return False, "not a recognised image", ""
+    target_dir = _bitmaps_dir(root) / BITMAP_UPLOAD_SUBDIR
+    try:
+        target_dir.mkdir(parents=True, exist_ok=True)
+        stem, ext = clean.rsplit(".", 1)
+        candidate = target_dir / clean
+        n = 1
+        while candidate.exists():
+            n += 1
+            candidate = target_dir / f"{stem}_{n}.{ext}"
+            if n > 999:
+                return False, "name clash, rename the file", ""
+        tmp = candidate.with_suffix(candidate.suffix + ".tmp")
+        tmp.write_bytes(raw)
+        tmp.replace(candidate)
+        rel = candidate.resolve().relative_to(Path(root).resolve()).as_posix()
+    except OSError as exc:
+        return False, f"cannot write bitmap: {exc}", ""
+    return True, "uploaded", rel
+
+
+def delete_bitmap(root: Path, rel: str) -> tuple[bool, str]:
+    """Delete one bitmap strictly inside bitmaps/. Returns (ok, message)."""
+    path = _resolve_bitmap_rel(root, rel or "")
+    if path is None or not path.is_file():
+        return False, "bitmap not found"
+    try:
+        path.unlink()
+    except OSError as exc:
+        return False, f"cannot delete bitmap: {exc}"
+    return True, "deleted"
+
+
+def sanitise_page_images(images) -> list[dict]:
+    """Coerce a page's images list to [{src,x,y,w,h}] with sane bounds."""
+    if not isinstance(images, list):
+        return []
+    out: list[dict] = []
+    for im in images:
+        if not isinstance(im, dict):
+            continue
+        src = str(im.get("src") or "").strip().replace("\\", "/").lstrip("/")
+        if not src.startswith(BITMAPS_DIR_NAME + "/"):
+            continue
+        try:
+            x = int(im.get("x", 0))
+        except (TypeError, ValueError):
+            x = 0
+        try:
+            y = int(im.get("y", 0))
+        except (TypeError, ValueError):
+            y = 0
+        spec: dict = {"src": src, "x": max(-1024, min(1024, x)),
+                      "y": max(-256, min(256, y))}
+        for key in ("w", "h"):
+            if im.get(key) is None or str(im.get(key)).strip() == "":
+                continue
+            try:
+                v = int(im.get(key))
+            except (TypeError, ValueError):
+                continue
+            if 1 <= v <= 1024:
+                spec[key] = v
+        out.append(spec)
+        if len(out) >= 8:  # cap overlays per page
+            break
+    return out

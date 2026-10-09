@@ -6,7 +6,8 @@
     var VIEWS = {
         editor: '/templates/pages/editor.html',
         program: '/templates/pages/program.html',
-        fonts: '/templates/pages/fonts.html'
+        fonts: '/templates/pages/fonts.html',
+        settings: '/templates/pages/settings.html'
     };
 
     var tabsEl = document.getElementById('studio-tabs');
@@ -34,6 +35,7 @@
                 if (window.NSLEditor) window.NSLEditor.init(contentEl);
                 if (window.NSLProgram) window.NSLProgram.init(contentEl);
                 if (window.NSLFonts) window.NSLFonts.init(contentEl);
+                if (window.NSLSettings) window.NSLSettings.init(contentEl);
                 if (window.NSLTabs) window.NSLTabs.init(contentEl);
             })
             .catch(function (err) {

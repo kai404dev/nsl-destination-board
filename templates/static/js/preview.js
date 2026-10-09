@@ -1,26 +1,44 @@
-/* NSLPreview - true 240x40 bitmap preview for the sign editor.
+/* NSLPreview - true bitmap preview for the sign editor.
  *
- * Renders the sign onto a <canvas width="240" height="40"> using the same
- * BDF fonts the board uses, so the preview matches the real display pixel
- * for pixel. Each element (number / destination / via) draws inside its own
- * bounding box (same from/to scheme as programs/*.dest) with configurable
- * horizontal + vertical alignment. The canvas is scaled up with
- * `image-rendering: pixelated`.
+ * Renders the sign onto a <canvas> using the same BDF fonts the board
+ * uses, so the preview matches the real display pixel for pixel. The
+ * logical size comes from opts (width/height, default 240x40 to match
+ * the stock panels); the caller sizes the canvas backing store
+ * (e.g. 3x for crisp dots) and CSS scales it up. Each element
+ * (number / destination / via) draws inside its own bounding box
+ * (same from/to scheme as programs/*.dest) with configurable
+ * horizontal + vertical alignment.
  *
  * Usage: NSLPreview.render(canvas, opts) where opts is:
  *   { layout, number, destination, via, guides, dots,
+ *     width, height,
  *     colors: { number, destination, via },
  *     fonts: { number: { name, size }, destination: {...}, via: {...} },
  *     boxes: { number: { x, y, w, h }, destination: {...}, via: {...} },
  *     aligns: { number: 'left'|'center'|'right', ... },
- *     valigns: { number: 'top'|'middle'|'bottom', ... } }
+ *     valigns: { number: 'top'|'middle'|'bottom', ... },
+ *     spacings: { number: { lineHeight: px|null, lineGap: px, letterSpacing: px, spaceWidth: px|null }, ... },
+ *     images: [{ src: 'bitmaps/shared/logo.png', x, y, w?, h? }, ...] }
  *
  * dots=true renders round LED pixels with gaps (like the real board);
  * guides=true outlines each element's box in its own colour.
  */
 (function () {
-    var W = 240;
-    var H = 40;
+    var DEFAULT_W = 240;
+    var DEFAULT_H = 40;
+
+    // Logical display size for one render (Settings tab), clamped.
+    function dimsOf(opts) {
+        opts = opts || {};
+        var w = parseInt(opts.width, 10);
+        var h = parseInt(opts.height, 10);
+        if (isNaN(w)) w = DEFAULT_W;
+        if (isNaN(h)) h = DEFAULT_H;
+        return {
+            w: Math.max(1, Math.min(1024, w)),
+            h: Math.max(1, Math.min(256, h))
+        };
+    }
 
     var GUIDE_COLORS = { number: '#4da3ff', destination: '#DB7700', via: '#46c46a' };
 
@@ -97,18 +115,24 @@
     // Ink extents of a string relative to the baseline: width in px,
     // top = highest ink pixel above baseline, bottom = lowest ink offset
     // (usually <= 0). Falls back to font ascent/descent for blank strings.
-    function measureString(font, str) {
+    // tracking adds extra px after every character (may be negative).
+    function measureString(font, str, tracking, spaceW) {
         var width = 0;
         var top = 0;
         var bottom = 0;
         var hasInk = false;
+        tracking = tracking || 0;
         for (var i = 0; i < str.length; i++) {
-            var glyph = font.glyphs[str.charCodeAt(i)];
-            if (!glyph) {
-                width += 4; // missing glyph: fixed advance, like a space
+            if (str.charCodeAt(i) === 32 && spaceW !== null && spaceW !== undefined) {
+                width += spaceW + tracking; // explicit space width wins over the font
                 continue;
             }
-            width += glyph.dw || glyph.w;
+            var glyph = font.glyphs[str.charCodeAt(i)];
+            if (!glyph) {
+                width += 4 + tracking; // missing glyph: fixed advance, like a space
+                continue;
+            }
+            width += (glyph.dw || glyph.w) + tracking;
             if (glyph.rows.length) {
                 hasInk = true;
                 if (glyph.yoff + glyph.h > top) top = glyph.yoff + glyph.h;
@@ -122,13 +146,18 @@
         return { width: width, top: top, bottom: bottom };
     }
 
-    function drawLine(ctx, font, line, x, baseline, color) {
+    function drawLine(ctx, font, line, x, baseline, color, tracking, spaceW) {
         ctx.fillStyle = color;
+        tracking = tracking || 0;
         var pen = x;
         for (var i = 0; i < line.length; i++) {
+            if (line.charCodeAt(i) === 32 && spaceW !== null && spaceW !== undefined) {
+                pen += spaceW + tracking; // explicit space width, no ink
+                continue;
+            }
             var glyph = font.glyphs[line.charCodeAt(i)];
             if (!glyph) {
-                pen += 4; // missing glyph: fixed advance, like a space
+                pen += 4 + tracking; // missing glyph: fixed advance, like a space
                 continue;
             }
             for (var r = 0; r < glyph.rows.length; r++) {
@@ -140,48 +169,64 @@
                     }
                 }
             }
-            pen += glyph.dw || glyph.w;
+            pen += (glyph.dw || glyph.w) + tracking;
         }
         return pen - x;
     }
 
-    function drawString(ctx, font, str, box, align, valign, color) {
+    function drawString(ctx, font, str, box, align, valign, color, spacing) {
         if (!str) return 0;
+        var sp = spacing || {};
+        var tracking = parseInt(sp.letterSpacing, 10);
+        if (isNaN(tracking)) tracking = 0;
+        tracking = Math.max(-20, Math.min(40, tracking));
+        var spaceW = (sp.spaceWidth === undefined || sp.spaceWidth === null || sp.spaceWidth === '')
+            ? null : parseInt(sp.spaceWidth, 10);
+        if (spaceW !== null && (isNaN(spaceW) || spaceW < 0 || spaceW > 64)) spaceW = null;
         var lines = String(str).split(/\r?\n/);
         if (lines.length <= 1) {
-            var m = measureString(font, str);
+            var m = measureString(font, str, tracking, spaceW);
             var x = box.x;
             if (align === 'center') x = Math.round(box.x + (box.w - m.width) / 2);
             else if (align === 'right') x = Math.round(box.x + box.w - m.width);
             var baseline = Math.round(box.y + box.h + m.bottom);
             if (valign === 'top') baseline = Math.round(box.y + m.top);
             else if (valign === 'middle') baseline = Math.round(box.y + box.h / 2 + (m.top + m.bottom) / 2);
-            return drawLine(ctx, font, str, x, baseline, color);
+            return drawLine(ctx, font, str, x, baseline, color, tracking, spaceW);
         }
         // Multi-line: stack lines using font ascent/descent so Enter in the
         // Via box (or "\n" in a .dest file) renders as separate rows.
+        // spacing = { lineHeight: px|null (null = auto), lineGap: px }.
         var measures = lines.map(function (line) {
-            return measureString(font, line);
+            return measureString(font, line, tracking, spaceW);
         });
         var ascent = font.ascent || 0;
         var descent = font.descent || 0;
-        var lineHeight = ascent + descent;
-        if (!lineHeight) {
+        var natural = ascent + descent;
+        if (!natural) {
             var maxInk = 0;
             measures.forEach(function (mm) {
                 var ink = mm.top - mm.bottom;
                 if (ink > maxInk) maxInk = ink;
             });
-            lineHeight = maxInk || 8;
+            natural = maxInk || 8;
             if (!ascent) {
                 var maxTop = 0;
                 measures.forEach(function (mm) {
                     if (mm.top > maxTop) maxTop = mm.top;
                 });
-                ascent = maxTop || lineHeight;
+                ascent = maxTop || natural;
             }
         }
-        var totalH = lineHeight * lines.length;
+        var explicit = (sp.lineHeight === undefined || sp.lineHeight === null || sp.lineHeight === '')
+            ? null : parseInt(sp.lineHeight, 10);
+        var base = (explicit !== null && !isNaN(explicit) && explicit >= 1 && explicit <= 256)
+            ? explicit : natural;
+        var gap = parseInt(sp.lineGap, 10);
+        if (isNaN(gap)) gap = 0;
+        gap = Math.max(-64, Math.min(200, gap));
+        var step = Math.max(1, base + gap);
+        var totalH = step * (lines.length - 1) + base;
         var startY = Math.round(box.y + box.h - totalH); // bottom (default)
         if (valign === 'top') startY = Math.round(box.y);
         else if (valign === 'middle') startY = Math.round(box.y + (box.h - totalH) / 2);
@@ -192,18 +237,18 @@
             var lx = box.x;
             if (align === 'center') lx = Math.round(box.x + (box.w - w) / 2);
             else if (align === 'right') lx = Math.round(box.x + box.w - w);
-            drawLine(ctx, font, line, lx, startY + ascent + i * lineHeight, color);
+            drawLine(ctx, font, line, lx, startY + ascent + i * step, color, tracking, spaceW);
         });
         return maxWidth;
     }
 
-    function drawRegion(ctx, font, text, box, align, valign, color) {
+    function drawRegion(ctx, font, text, box, align, valign, color, spacing) {
         ctx.save();
         ctx.beginPath();
         ctx.rect(box.x, box.y, box.w, box.h);
         ctx.clip();
         if (font && text) {
-            drawString(ctx, font, text, box, align || 'left', valign || 'bottom', color);
+            drawString(ctx, font, text, box, align || 'left', valign || 'bottom', color, spacing);
         } else if (text) {
             // BDF unavailable: monospace fallback, same box + alignment.
             // Supports "\n" by splitting into rows within the box.
@@ -235,9 +280,10 @@
         };
     }
 
-    function draw(ctx, fonts, opts) {
+    function draw(ctx, fonts, opts, images) {
+        var D = dimsOf(opts);
         ctx.fillStyle = '#000';
-        ctx.fillRect(0, 0, W, H);
+        ctx.fillRect(0, 0, D.w, D.h);
 
         var boxes = opts.boxes || defaultBoxes();
         var items = [
@@ -251,8 +297,29 @@
             drawRegion(ctx, fonts[item.key], item.text, box,
                 (opts.aligns && opts.aligns[item.key]) || 'center',
                 (opts.valigns && opts.valigns[item.key]) || 'middle',
-                opts.colors[item.key]);
+                opts.colors[item.key],
+                (opts.spacings && opts.spacings[item.key]) || null);
         });
+        // Positioned bitmap overlays, drawn in order over the text.
+        // imageSmoothing is off so scaled logos stay crisp like the board's
+        // NEAREST scaling.
+        if (images) {
+            ctx.save();
+            ctx.imageSmoothingEnabled = false;
+            (opts.images || []).forEach(function (spec) {
+                if (!spec || !spec.src) return;
+                var img = images[spec.src];
+                if (!img || !img.width) return;
+                var x = Math.round(spec.x || 0);
+                var y = Math.round(spec.y || 0);
+                var w = spec.w > 0 ? Math.round(spec.w) : img.naturalWidth || img.width;
+                var h = spec.h > 0 ? Math.round(spec.h) : img.naturalHeight || img.height;
+                try {
+                    ctx.drawImage(img, x, y, w, h);
+                } catch (err) { /* bad image: skip */ }
+            });
+            ctx.restore();
+        }
     }
 
     function drawGuides(ctx, boxes, hideVia) {
@@ -268,7 +335,7 @@
         ctx.restore();
     }
 
-    // Round-LED overlay: repaints the 240x40 bitmap as circular dots with
+    // Round-LED overlay: repaints the logical bitmap as circular dots with
     // real gaps, like the physical panels. Drawn supersampled (s = backing
     // pixels per LED) so the circles survive - drawing them at 1px each
     // just reads as dimmer squares. getPixel(x, y) -> [r, g, b].
@@ -283,7 +350,7 @@
         return Math.min(255, Math.round(v * DOT_GAIN));
     }
 
-    function drawDots(ctx, getPixel, s) {
+    function drawDots(ctx, getPixel, s, W, H) {
         s = s || 1;
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, W * s, H * s);
@@ -302,6 +369,46 @@
 
     var latest = 0;
 
+    var imageCache = {}; // src -> HTMLImageElement (resolved, maybe broken)
+
+    function loadImage(src) {
+        if (Object.prototype.hasOwnProperty.call(imageCache, src)) {
+            return Promise.resolve(imageCache[src]);
+        }
+        return new Promise(function (resolve) {
+            var img = new Image();
+            img.onload = function () {
+                imageCache[src] = img;
+                resolve(img);
+            };
+            img.onerror = function () {
+                imageCache[src] = null;
+                resolve(null);
+            };
+            img.src = '/' + String(src).replace(/^\/+/, '');
+        });
+    }
+
+    function loadImages(specs) {
+        var seen = {};
+        var jobs = [];
+        (specs || []).forEach(function (spec) {
+            if (!spec || !spec.src || seen[spec.src]) return;
+            seen[spec.src] = true;
+            jobs.push(loadImage(spec.src).then(function (img) {
+                return { src: spec.src, img: img };
+            }));
+        });
+        if (!jobs.length) return Promise.resolve({});
+        return Promise.all(jobs).then(function (results) {
+            var bySrc = {};
+            results.forEach(function (r) {
+                bySrc[r.src] = r.img;
+            });
+            return bySrc;
+        });
+    }
+
     function render(canvas, opts) {
         if (!canvas || !canvas.getContext) return Promise.resolve();
         var my = ++latest;
@@ -316,7 +423,12 @@
                 return { key: key, font: font };
             }));
         });
-        return Promise.all(jobs).then(function (results) {
+        var imageJob = (typeof Image !== 'undefined')
+            ? loadImages(opts.images)
+            : Promise.resolve({});
+        return Promise.all([Promise.all(jobs), imageJob]).then(function (both) {
+            var results = both[0];
+            var images = both[1];
             if (my !== latest) return; // superseded by a newer render
             var byKey = {};
             results.forEach(function (result) {
@@ -330,17 +442,20 @@
             var ctx = canvas.getContext('2d');
             if (!ctx) return; // no 2d context available
             var boxes = opts.boxes || defaultBoxes();
-            // Backing store may be supersampled (e.g. 720x120) for crisp dots.
-            var s = (canvas.width || W) / W;
+            var D = dimsOf(opts);
+            // Backing store may be supersampled (e.g. 3x) for crisp dots.
+            // The caller sizes canvas.width/height = dims * supersample.
+            var s = (canvas.width || D.w) / D.w || 1;
             if (canvas.style) {
                 canvas.style.imageRendering = opts.dots ? 'auto' : 'pixelated';
+                canvas.style.aspectRatio = D.w + ' / ' + D.h;
             }
             var off = null;
             var octx = null;
             if (opts.dots && typeof document !== 'undefined' && document.createElement) {
                 off = document.createElement('canvas');
-                off.width = W;
-                off.height = H;
+                off.width = D.w;
+                off.height = D.h;
                 octx = off.getContext && off.getContext('2d');
                 if (!octx || !octx.getImageData) {
                     off = null;
@@ -348,17 +463,17 @@
                 }
             }
             if (off) {
-                draw(octx, fonts, opts);
-                var data = octx.getImageData(0, 0, W, H).data;
+                draw(octx, fonts, opts, images);
+                var data = octx.getImageData(0, 0, D.w, D.h).data;
                 drawDots(ctx, function (x, y) {
-                    var i = (y * W + x) * 4;
+                    var i = (y * D.w + x) * 4;
                     return [data[i], data[i + 1], data[i + 2]];
-                }, s);
+                }, s, D.w, D.h);
             } else {
                 // Square pixels, scaled to fill the backing store.
                 ctx.save();
                 ctx.scale(s, s);
-                draw(ctx, fonts, opts);
+                draw(ctx, fonts, opts, images);
                 ctx.restore();
             }
             if (opts.guides) {

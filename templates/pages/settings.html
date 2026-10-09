@@ -1,0 +1,50 @@
+<div class="settings" id="settings-root">
+    <div class="prog-details">
+        <h2>Settings</h2>
+        <p class="muted">Stored in this browser. Display size drives the Editor canvas
+            (and board preview pushes); defaults seed fresh drafts and new pages.</p>
+        <div class="prog-defaults">
+            <h3>Display size</h3>
+            <div class="add-grid">
+                <label>Width (px)<input type="number" id="set-width" min="1" max="1024"></label>
+                <label>Height (px)<input type="number" id="set-height" min="1" max="256"></label>
+            </div>
+        </div>
+        <div class="prog-defaults">
+            <h3>Defaults</h3>
+            <div class="add-grid">
+                <label>Colour<input type="color" id="set-colour" value="#DB7700"></label>
+                <label>Layout
+                    <select id="set-layout">
+                        <option value="top">Top via</option>
+                        <option value="bottom">Bottom via</option>
+                        <option value="left">Left via</option>
+                        <option value="right">Right via</option>
+                        <option value="none">No via</option>
+                    </select>
+                </label>
+            </div>
+            <div class="set-fonts">
+                <div class="set-font-row">
+                    <span>Number</span>
+                    <select id="set-number-font"><option>Loading…</option></select>
+                    <select id="set-number-size"><option>…</option></select>
+                </div>
+                <div class="set-font-row">
+                    <span>Destination</span>
+                    <select id="set-dest-font"><option>Loading…</option></select>
+                    <select id="set-dest-size"><option>…</option></select>
+                </div>
+                <div class="set-font-row">
+                    <span>Via</span>
+                    <select id="set-via-font"><option>Loading…</option></select>
+                    <select id="set-via-size"><option>…</option></select>
+                </div>
+            </div>
+            <div class="set-bar">
+                <button id="set-reset" class="btn-danger" type="button">Reset to factory</button>
+                <span class="prog-status" id="set-status"></span>
+            </div>
+        </div>
+    </div>
+</div>

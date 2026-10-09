@@ -18,6 +18,9 @@ Routes:
                                       -> GET/PUT .../glyphs/<encoding>
     /api/programs                     -> GET list, POST {"name"} to create
     /api/programs/<name>              -> GET/PUT/DELETE one .dest program
+    /api/bitmaps                      -> GET list, POST {filename,data} to upload
+    /api/bitmaps/<bitmaps/...>        -> DELETE one bitmap
+    /bitmaps/<path>                   -> raw bitmap files (page overlays)
     /api/board/state                  -> GET current board selection + info
     /api/board/select                 -> POST {program,service,destination}
     /api/board/preview                -> POST {page,width,height,seconds}
@@ -46,6 +49,7 @@ STATIC_DIR = TEMPLATE_DIR / "static"
 PAGES_DIR = TEMPLATE_DIR / "pages"
 FONTS_DIR = ROOT / "fonts"
 PROGRAMS_DIR = ROOT / "programs"
+BITMAPS_DIR = ROOT / "bitmaps"
 MAX_PROGRAM_BYTES = 2 * 1024 * 1024
 
 
@@ -120,6 +124,13 @@ class BoardHandler(SimpleHTTPRequestHandler):
         if parsed.path.endswith("/") and url_path != "/":
             url_path += "/"
 
+        # 0. Uploaded bitmaps: /bitmaps/<path> -> bitmaps/<path>.
+        if url_path == "/bitmaps" or url_path == "/bitmaps/":
+            return self._listing("bitmaps", BITMAPS_DIR)
+        if url_path.startswith("/bitmaps/"):
+            rel = url_path[len("/bitmaps/"):]
+            return self._serve_file(BITMAPS_DIR / rel, base=BITMAPS_DIR)
+
         # 1. Top-level pages: / , /studio, /controller (+ .html variants).
         if url_path in PAGE_ROUTES:
             return self._serve_file(self.template_dir / PAGE_ROUTES[url_path])
@@ -146,7 +157,22 @@ class BoardHandler(SimpleHTTPRequestHandler):
         # 5. Raw BDF fonts for the 240x40 canvas preview.
         if url_path.startswith("/fonts/"):
             rel = url_path[len("/fonts/"):]
-            return self._serve_file(FONTS_DIR / rel, base=FONTS_DIR)
+            target = FONTS_DIR / rel
+            if not target.is_file():
+                # Fallback for misnamed files: <font>/<font>-<size>.bdf may
+                # actually live as <font>/*-<size>.bdf (e.g. HaxorNarrow-15
+                # inside HaxorMedium/). api.font_file() already knows how.
+                parts = rel.split("/")
+                if len(parts) == 2:
+                    font_name, filename = parts
+                    stem, dot, ext = filename.rpartition(".")
+                    _head, sep, tail = stem.rpartition("-")
+                    if dot and sep and api.is_size_token(tail):
+                        fallback = api.font_file(
+                            FONTS_DIR, urllib.parse.unquote(font_name), tail)
+                        if fallback is not None:
+                            target = fallback
+            return self._serve_file(target, base=FONTS_DIR)
 
         # 6. Font API used by the editor partial.
         if url_path in ("/api/fonts", "/api/fonts/"):
@@ -172,6 +198,8 @@ class BoardHandler(SimpleHTTPRequestHandler):
         # 7. Programs API: list and fetch .dest files.
         if url_path in ("/api/programs", "/api/programs/"):
             return self._serve_json(api.list_programs(PROGRAMS_DIR))
+        if url_path in ("/api/bitmaps", "/api/bitmaps/"):
+            return self._serve_json(api.list_bitmaps(ROOT))
         if url_path in ("/api/board/state", "/api/board/state/"):
             return self._serve_json(_board_state_payload())
         if url_path.startswith("/api/programs/"):
@@ -268,6 +296,15 @@ class BoardHandler(SimpleHTTPRequestHandler):
             api.clear_preview()
             return self._serve_json({"ok": True})
 
+        # Delete an uploaded bitmap: DELETE /api/bitmaps/<bitmaps/...>.
+        if url_path.startswith("/api/bitmaps/"):
+            rel = urllib.parse.unquote(url_path[len("/api/bitmaps/"):])
+            ok, message = api.delete_bitmap(ROOT, rel)
+            if not ok:
+                status = 404 if message == "bitmap not found" else 400
+                return self._serve_json({"error": message}, status=status)
+            return self._serve_json({"ok": True})
+
         # Delete a .dest program file.
         if url_path.startswith("/api/programs/"):
             name = urllib.parse.unquote(url_path[len("/api/programs/"):].strip("/"))
@@ -284,6 +321,20 @@ class BoardHandler(SimpleHTTPRequestHandler):
         url_path = posixpath.normpath(parsed.path or "/")
         if parsed.path.endswith("/") and url_path != "/":
             url_path += "/"
+
+        # Upload a bitmap: POST {filename, data (base64 or data-URL)}.
+        if url_path in ("/api/bitmaps", "/api/bitmaps/"):
+            data, error = self._read_json_body()
+            if error:
+                return self._serve_json({"error": error}, status=400)
+            if not isinstance(data, dict):
+                return self._serve_json({"error": "body must be JSON"}, status=400)
+            ok, message, rel = api.save_bitmap(
+                ROOT, str(data.get("filename") or ""),
+                str(data.get("data") or ""))
+            if not ok:
+                return self._serve_json({"error": message}, status=400)
+            return self._serve_json({"ok": True, "path": rel}, status=201)
 
         # Live editor preview: POST {page,width,height,seconds}.
         if url_path in ("/api/board/preview", "/api/board/preview/"):
