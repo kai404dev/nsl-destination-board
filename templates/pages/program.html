@@ -14,10 +14,15 @@
             <input type="text" id="new-program" placeholder="New program name">
             <button type="button" data-action="add-program">New program</button>
         </div>
+        <div class="prog-transfer">
+            <button type="button" data-action="export">Export</button>
+            <input type="file" id="import-file" accept=".dest,application/json">
+        </div>
         <div class="prog-defaults">
             <h3>Defaults</h3>
+            <label for="prog-def-colour">Colour</label>
+            <input type="color" id="prog-def-colour" value="#DB7700">
             <div class="add-grid">
-                <label>Colour<input type="color" id="prog-def-colour" value="#DB7700"></label>
                 <label>Rotation (s)<input type="number" id="prog-def-speed" min="0.3" step="0.5"></label>
                 <label>Width (px)<input type="number" id="prog-def-width" min="1" max="1024"></label>
                 <label>Height (px)<input type="number" id="prog-def-height" min="1" max="256"></label>

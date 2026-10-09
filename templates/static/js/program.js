@@ -251,7 +251,9 @@
             sortedDestinations(services, service).forEach(function (name) {
                 var destination = services[service][name] || {};
                 html += '<div class="service"><div class="service-head"><strong>' + esc(name) + '</strong>' +
-                    '<span class="code">' + esc(destination.service_code || '') + '</span>';
+                    '<input type="text" class="code-edit" data-service="' + esc(service) +
+                    '" data-destination="' + esc(name) + '" value="' + esc(destination.service_code || '') +
+                    '" maxlength="12" spellcheck="false" aria-label="Service code for ' + esc(name) + '">';
                 if (clipboard) {
                     html += '<button type="button" class="paste-btn" data-action="paste-page" data-service="' + esc(service) +
                         '" data-destination="' + esc(name) + '">Paste here</button>';
@@ -441,6 +443,9 @@
         pages[key] = carryPage(keys.length ? pages[keys[keys.length - 1]] : null);
         persist(root);
         render(root);
+        // Save straight through so the server file matches: the Editor tab
+        // reads pages from the server, not from this working copy.
+        doSave(root);
     }
 
     function addProgram(root) {
@@ -646,7 +651,9 @@
         if (codeEl) codeEl.value = '';
         persist(root);
         render(root);
-        setStatus(root, 'Unsaved changes');
+        // Save straight through so the .dest file matches: the Editor tab
+        // reads destinations from the server, not from this working copy.
+        doSave(root);
     }
 
     function editPage(root, service, destinationName, pageKey) {
@@ -717,6 +724,101 @@
         else if (action === 'move-page') grabPage('move', root, btn.dataset.service, btn.dataset.destination, btn.dataset.page);
         else if (action === 'paste-page') pastePage(root, btn.dataset.service, btn.dataset.destination);
         else if (action === 'edit') editPage(root, btn.dataset.service, btn.dataset.destination, btn.dataset.page);
+        else if (action === 'export') exportProgram(root);
+    }
+
+    // Download the working copy (including any unsaved edits) as <name>.dest.
+    function exportProgram(root) {
+        if (!S.name || !S.data) {
+            setStatus(root, 'Nothing to export');
+            return;
+        }
+        try {
+            var blob = new Blob([JSON.stringify(S.data, null, 2) + '\n'], { type: 'application/json' });
+            var a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = S.name + '.dest';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(function () {
+                try {
+                    URL.revokeObjectURL(a.href);
+                    a.remove();
+                } catch (err) { /* ignore */ }
+            }, 500);
+            setStatus(root, S.dirty
+                ? 'Exported ' + S.name + '.dest (includes unsaved changes)'
+                : 'Exported ' + S.name + '.dest');
+        } catch (err) {
+            console.error(err);
+            setStatus(root, 'Export failed');
+        }
+    }
+
+    // Import a .dest file: create (or, with confirmation, overwrite) the
+    // program, write the file content, then open it.
+    function importProgram(root, file) {
+        if (!file) return;
+        if (file.size > 2 * 1024 * 1024) {
+            setStatus(root, 'File too big (2 MB max)');
+            return;
+        }
+        var reader = new FileReader();
+        reader.onload = function () {
+            var data;
+            try {
+                data = JSON.parse(reader.result);
+            } catch (err) {
+                setStatus(root, 'Not a valid .dest file');
+                return;
+            }
+            if (!data || typeof data !== 'object' || typeof data.services !== 'object') {
+                setStatus(root, 'File must be a program with services');
+                return;
+            }
+            var name = String(file.name || '').replace(/\.dest$/i, '');
+            if (!/^[A-Za-z0-9_-]+$/.test(name)) {
+                setStatus(root, 'File name must be letters, digits, - or _');
+                return;
+            }
+            setStatus(root, 'Importing ' + name + '…');
+            fetch('/api/programs', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: name })
+            }).then(function (response) {
+                if (response.status === 409) {
+                    if (!window.confirm('Program ' + name + ' exists. Overwrite it?')) {
+                        throw new Error('cancelled');
+                    }
+                    return null; // exists: PUT overwrites it below
+                }
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                return response.json();
+            }).then(function () {
+                return fetch('/api/programs/' + encodeURIComponent(name), {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+            }).then(function (put) {
+                if (!put.ok) throw new Error('HTTP ' + put.status);
+                storeDel(draftKey(name)); // drop any stale browser draft
+                storeSet(SEL_KEY, name);
+                var input = $(root, 'import-file');
+                if (input) input.value = '';
+                return refresh(root);
+            }).then(function () {
+                setStatus(root, 'Imported ' + name);
+            }).catch(function (err) {
+                console.error(err);
+                setStatus(root, err.message === 'cancelled' ? 'Import cancelled' : 'Import failed');
+            });
+        };
+        reader.onerror = function () {
+            setStatus(root, 'Could not read file');
+        };
+        reader.readAsText(file);
     }
 
     function onChange(root, event) {
@@ -727,6 +829,22 @@
             S.dirty = false;
             storeSet(SEL_KEY, S.name);
             loadProgram(root);
+            return;
+        }
+        // .dest file import.
+        if (t && t.id === 'import-file' && root.contains(t)) {
+            importProgram(root, t.files && t.files[0]);
+            return;
+        }
+        // Service code edit: update the working copy (Save writes the file).
+        if (t && t.classList && t.classList.contains('code-edit') && root.contains(t)) {
+            var group = S.data && S.data.services && S.data.services[t.dataset.service];
+            var dest = group && group[t.dataset.destination];
+            if (dest) {
+                dest.service_code = (t.value || '').trim();
+                persist(root);
+                render(root); // re-sort destinations by code
+            }
             return;
         }
         onDefaultsInput(root, event);

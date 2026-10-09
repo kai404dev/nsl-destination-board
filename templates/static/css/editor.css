@@ -246,8 +246,7 @@
     padding: 0.5rem 1.1rem;
     background: transparent;
     color: var(--text, #f2f2f4);
-    border: 1px solid var(--border, #2c2c33);
-    border-radius: 8px;
+    border: 1px solid var(--border, #2c2c33);    border-radius: 8px;
     cursor: pointer;
     font: inherit;
     font-weight: 600;
@@ -255,6 +254,37 @@
 
 .new-program button:hover {
     border-color: var(--accent, #DB7700);
+}
+
+/* Export / import row: same look as the new-program row. */
+.prog-transfer {
+    display: flex;
+    gap: 0.6rem;
+    align-items: center;
+}
+
+.prog-transfer button {
+    flex-shrink: 0;
+    min-height: 44px;
+    padding: 0.5rem 1.1rem;
+    background: transparent;
+    color: var(--text, #f2f2f4);
+    border: 1px solid var(--border, #2c2c33);
+    border-radius: 8px;
+    cursor: pointer;
+    font: inherit;
+    font-weight: 600;
+}
+
+.prog-transfer button:hover {
+    border-color: var(--accent, #DB7700);
+}
+
+.prog-transfer input[type="file"] {
+    flex: 1;
+    min-width: 0;
+    color: var(--muted, #a7a7b3);
+    font-size: 0.85rem;
 }
 
 .service-key {
@@ -277,6 +307,19 @@
 .service-head .code {
     color: var(--muted, #a7a7b3);
     font-size: 0.85rem;
+}
+
+/* Editable service code: compact single-line input in the heading row. */
+.service-head .code-edit {
+    width: 5em;
+    min-height: 0;
+    padding: 0.2rem 0.4rem;
+    font-size: 0.85rem;
+}
+
+.service-head .code-edit:focus {
+    outline: none;
+    border-color: var(--accent, #DB7700);
 }
 
 .page-list {
@@ -381,7 +424,14 @@
 
 .add-grid label {
     margin: 0;
-    width: ;
+}
+
+/* Settings font rows stack label-above like everywhere else. */
+.set-fonts {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    margin-top: 0.6rem;
 }
 
 #service-list {
