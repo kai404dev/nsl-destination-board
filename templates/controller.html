@@ -5,6 +5,76 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Controller | NSL Board Portal</title>
     <link rel="stylesheet" href="/static/css/portal.css">
+    <style>
+        /* Controller mode: landscape keypad layout (also toggleable by hand). */
+        #mode { display: none; }
+        body.ctl-mode #mode { display: grid; }
+        body.ctl-mode label[for="ctl-service"],
+        body.ctl-mode #ctl-service,
+        body.ctl-mode label[for="ctl-destination"],
+        body.ctl-mode #ctl-destination { display: none; }
+        #mode {
+            grid-template-columns: minmax(0, 1fr) auto auto;
+            gap: 0.75rem;
+            align-items: stretch;
+            margin-top: 1rem;
+        }
+        .mode-preview { min-width: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+        #mode-canvas {
+            width: 100%;
+            height: auto;
+            aspect-ratio: 6 / 1;
+            background: #000;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            image-rendering: pixelated;
+            cursor: pointer;
+        }
+        .mode-keys {
+            display: grid;
+            grid-template-columns: repeat(3, 58px);
+            gap: 0.4rem;
+            align-content: start;
+        }
+        .mode-keys button, .mode-nav button {
+            min-height: 48px;
+            min-width: 48px;
+            font-size: 1.25rem;
+            background: var(--field);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+        .mode-keys button:active, .mode-nav button:active {
+            border-color: var(--accent);
+        }
+        .mode-nav { display: flex; flex-direction: column; gap: 0.4rem; }
+        .mode-nav button { flex: 1; }
+        #mode-code {
+            text-align: center;
+            font-size: 1.4rem;
+            font-weight: 700;
+            min-height: 2rem;
+            letter-spacing: 0.2em;
+        }
+        .tbtn {
+            min-height: 44px;
+            padding: 0.5rem 1.1rem;
+            background: transparent;
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            cursor: pointer;
+            font: inherit;
+            font-weight: 600;
+        }
+        .tbtn[aria-pressed="true"] {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+    </style>
 </head>
 <body>
     <header class="topbar">
@@ -29,10 +99,39 @@
 
     <div style="margin-top:1rem; display:flex; gap:0.75rem; flex-wrap:wrap;">
         <button id="ctl-show" class="btn-primary" type="button">Show on board</button>
+        <button id="ctl-mode" class="tbtn" type="button" aria-pressed="false">📟 Controller mode</button>
     </div>
+    <p class="muted">Tip: rotate your phone sideways for the keypad. Tap the preview for the next page.</p>
     <p id="ctl-status" class="muted" role="status"></p>
     <p id="ctl-info" class="muted"></p>
 
+    <div id="mode" aria-label="Controller keypad mode">
+        <div class="mode-preview">
+            <canvas id="mode-canvas" width="240" height="40" title="Tap for next page"></canvas>
+            <div id="mode-caption" class="muted">Pick a program above.</div>
+        </div>
+        <div class="mode-keys" role="group" aria-label="Code keypad">
+            <button type="button" data-key="1">1</button>
+            <button type="button" data-key="2">2</button>
+            <button type="button" data-key="3">3</button>
+            <button type="button" data-key="4">4</button>
+            <button type="button" data-key="5">5</button>
+            <button type="button" data-key="6">6</button>
+            <button type="button" data-key="7">7</button>
+            <button type="button" data-key="8">8</button>
+            <button type="button" data-key="9">9</button>
+            <button type="button" data-key="C">C</button>
+            <button type="button" data-key="0">0</button>
+            <button type="button" data-key="B">⌫</button>
+        </div>
+        <div class="mode-nav">
+            <button type="button" id="mode-prev" aria-label="Previous destination">▲</button>
+            <div id="mode-code" aria-live="polite">–</div>
+            <button type="button" id="mode-next" aria-label="Next destination">▼</button>
+        </div>
+    </div>
+
+    <script src="/static/js/preview.js"></script>
     <script>
     (function () {
         var progEl = document.getElementById('ctl-program');
@@ -224,12 +323,268 @@
                     return;
                 }
                 fill(progEl, names);
-                return refreshState().then(function () { say(''); });
+                return refreshState().then(function () { say(''); syncMode(); });
             })
             .catch(function (err) {
                 console.error(err);
                 nowEl.textContent = 'Could not reach portal API.';
             });
+
+        /* ---- Controller mode: keypad + arrows + live preview ----
+           Flat list of every destination in the program (service order,
+           then code order - same as the Program tab). Keypad narrows by
+           service_code, arrows step through all, preview shows the page
+           about to be sent. Show on board pushes the current pick. */
+        var D = { list: [], idx: -1, buffer: '', page: 0 };
+        var canvas = document.getElementById('mode-canvas');
+        var captionEl = document.getElementById('mode-caption');
+        var codeEl = document.getElementById('mode-code');
+        var modeBtn = document.getElementById('ctl-mode');
+
+        function destCode(program, service, name) {
+            var dest = ((program.services || {})[service] || {})[name] || {};
+            return (dest.service_code || '').trim();
+        }
+
+        function buildModeList(program) {
+            D.list = [];
+            serviceKeys(program).forEach(function (service) {
+                destinationsOf(program, service).forEach(function (name) {
+                    D.list.push({ service: service, destination: name, code: destCode(program, service, name) });
+                });
+            });
+        }
+
+        function splitFont(f) {
+            var s = String(f || '');
+            var i = s.lastIndexOf('-');
+            if (i < 0) return { name: s, size: '' };
+            return { name: s.slice(0, i), size: s.slice(i + 1) };
+        }
+
+        function numOr(v, fallback) {
+            var n = parseInt(v, 10);
+            return isNaN(n) ? fallback : n;
+        }
+
+        function oneOf(v, allowed, fallback) {
+            return allowed.indexOf(v) >= 0 ? v : fallback;
+        }
+
+        function pageBox(el, fb) {
+            el = el || {};
+            var y = numOr(el.front_Y != null ? el.front_Y : el.from_Y, fb.y);
+            var x = numOr(el.from_X, fb.x);
+            var w = numOr(el.to_X, fb.x + fb.w) - x;
+            var h = numOr(el.to_Y, fb.y + fb.h) - y;
+            return {
+                x: Math.max(0, Math.min(239, x)),
+                y: Math.max(0, Math.min(39, y)),
+                w: w >= 1 && w <= 240 ? w : fb.w,
+                h: h >= 1 && h <= 40 ? h : fb.h
+            };
+        }
+
+        var MODE_FB = {
+            number: { x: 180, y: 0, w: 60, h: 40 },
+            destination: { x: 0, y: 0, w: 180, h: 25 },
+            via: { x: 0, y: 25, w: 180, h: 15 }
+        };
+
+        function pageKeys(text) {
+            return Object.keys(text || {}).sort(function (a, b) {
+                function n(k) {
+                    var m = /^(\d+)/.exec(k);
+                    return m ? parseInt(m[1], 10) : 9999;
+                }
+                return n(a) - n(b) || (a < b ? -1 : a > b ? 1 : 0);
+            });
+        }
+
+        function modeCaption(text) {
+            if (captionEl) captionEl.textContent = text;
+        }
+
+        function updateCodeReadout() {
+            if (codeEl) codeEl.textContent = D.buffer || '–';
+        }
+
+        function renderModePreview() {
+            var d = D.list[D.idx];
+            if (!canvas) return;
+            if (!d) {
+                var ctx0 = canvas.getContext('2d');
+                if (ctx0) { ctx0.fillStyle = '#000'; ctx0.fillRect(0, 0, 240, 40); }
+                modeCaption('No destinations in this program.');
+                return;
+            }
+            getProgram(progEl.value).then(function (program) {
+                var dest = (((program.services || {})[d.service] || {})[d.destination]) || {};
+                var text = dest.text;
+                var bitmaps = dest.bitmaps;
+                var label = (d.code ? d.code + ' – ' : '') + d.destination + ' · service ' + d.service;
+                if (text && typeof text === 'object' && Object.keys(text).length) {
+                    var keys = pageKeys(text);
+                    var key = keys[D.page % keys.length];
+                    var page = text[key] || {};
+                    if (!window.NSLPreview) {
+                        modeCaption(label + ' (preview unavailable)');
+                        return;
+                    }
+                    var colors = {}, fonts = {}, boxes = {}, aligns = {}, valigns = {};
+                    ['number', 'destination', 'via'].forEach(function (k) {
+                        var el = page[k] || {};
+                        var split = splitFont(el.font);
+                        colors[k] = el.colour || '#DB7700';
+                        fonts[k] = { name: split.name, size: split.size };
+                        boxes[k] = pageBox(el, MODE_FB[k]);
+                        aligns[k] = oneOf(el.align, ['left', 'center', 'right'], 'center');
+                        valigns[k] = oneOf(el.valign, ['top', 'middle', 'bottom'], 'middle');
+                    });
+                    window.NSLPreview.render(canvas, {
+                        layout: 'bottom',
+                        number: (page.number || {}).text || '',
+                        destination: (page.destination || {}).text || '',
+                        via: (page.via || {}).text || '',
+                        colors: colors, fonts: fonts, boxes: boxes,
+                        aligns: aligns, valigns: valigns, dots: true
+                    });
+                    modeCaption(label + ' · ' + key + ' (' + (D.page % keys.length + 1) + '/' + keys.length + ') — tap preview for next page');
+                } else if (Array.isArray(bitmaps) && bitmaps.length) {
+                    var rel = String(bitmaps[D.page % bitmaps.length] || '').replace(/^\/+/, '');
+                    var ctx = canvas.getContext('2d');
+                    var img = new Image();
+                    img.onload = function () {
+                        ctx.fillStyle = '#000';
+                        ctx.fillRect(0, 0, 240, 40);
+                        try {
+                            ctx.imageSmoothingEnabled = false;
+                            ctx.drawImage(img, 0, 0, 240, 40);
+                        } catch (err) { /* ignore */ }
+                    };
+                    img.onerror = function () {
+                        ctx.fillStyle = '#000';
+                        ctx.fillRect(0, 0, 240, 40);
+                        modeCaption(label + ' (bitmap missing)');
+                    };
+                    img.src = '/' + rel;
+                    modeCaption(label + ' · bitmap ' + (D.page % bitmaps.length + 1) + '/' + bitmaps.length);
+                } else {
+                    modeCaption(label + ' (empty)');
+                }
+            }).catch(function (err) {
+                console.error(err);
+                modeCaption('Could not load preview.');
+            });
+        }
+
+        function modeSelect(i) {
+            if (!D.list.length) return;
+            D.idx = ((i % D.list.length) + D.list.length) % D.list.length;
+            D.page = 0;
+            var d = D.list[D.idx];
+            servEl.value = d.service;
+            onService(false).then(function () {
+                destEl.value = d.destination;
+                return onService(false);
+            }).then(function () {
+                renderModePreview();
+                updateCodeReadout();
+            });
+        }
+
+        function modeKey(k) {
+            if (k === 'C') {
+                D.buffer = '';
+            } else if (k === 'B') {
+                D.buffer = D.buffer.slice(0, -1);
+            } else if (D.buffer.length < 8) {
+                D.buffer += k;
+            }
+            updateCodeReadout();
+            if (!D.buffer) return;
+            var exact = -1, pref = -1;
+            D.list.forEach(function (d, i) {
+                if (!d.code) return;
+                if (d.code === D.buffer && exact < 0) exact = i;
+                if (pref < 0 && d.code.indexOf(D.buffer) === 0) pref = i;
+            });
+            var i = exact >= 0 ? exact : pref;
+            if (i >= 0) {
+                modeSelect(i);
+            } else {
+                modeCaption('No code starts with "' + D.buffer + '" — keep typing or press C.');
+            }
+        }
+
+        function syncMode() {
+            var name = progEl.value;
+            if (!name) return;
+            getProgram(name).then(function (program) {
+                buildModeList(program);
+                if (!D.list.length) {
+                    D.idx = -1;
+                    renderModePreview();
+                    return;
+                }
+                var at = D.list.findIndex(function (d) {
+                    return d.service === servEl.value && d.destination === destEl.value;
+                });
+                D.idx = at >= 0 ? at : 0;
+                D.buffer = '';
+                updateCodeReadout();
+                var d = D.list[D.idx];
+                servEl.value = d.service;
+                onService(false).then(function () {
+                    destEl.value = d.destination;
+                    return onService(false);
+                }).then(renderModePreview);
+            }).catch(function (err) {
+                console.error(err);
+            });
+        }
+
+        document.querySelectorAll('#mode [data-key]').forEach(function (btn) {
+            btn.addEventListener('click', function () { modeKey(btn.dataset.key); });
+        });
+        var prevBtn = document.getElementById('mode-prev');
+        var nextBtn = document.getElementById('mode-next');
+        if (prevBtn) prevBtn.addEventListener('click', function () {
+            D.buffer = '';
+            updateCodeReadout();
+            modeSelect(D.idx - 1);
+        });
+        if (nextBtn) nextBtn.addEventListener('click', function () {
+            D.buffer = '';
+            updateCodeReadout();
+            modeSelect(D.idx + 1);
+        });
+        if (canvas) canvas.addEventListener('click', function () {
+            D.page++;
+            renderModePreview();
+        });
+
+        // Toggle, with auto-enable on landscape phones.
+        var modeMQ = window.matchMedia
+            ? window.matchMedia('(orientation: landscape) and (max-height: 500px)')
+            : null;
+        var modeManual = null;
+        function applyMode() {
+            var on = modeManual !== null ? modeManual : !!(modeMQ && modeMQ.matches);
+            document.body.classList.toggle('ctl-mode', on);
+            if (modeBtn) {
+                modeBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+                modeBtn.textContent = on ? '📟 Exit controller mode' : '📟 Controller mode';
+            }
+            if (on) syncMode();
+        }
+        if (modeBtn) modeBtn.addEventListener('click', function () {
+            modeManual = !document.body.classList.contains('ctl-mode');
+            applyMode();
+        });
+        if (modeMQ && modeMQ.addEventListener) modeMQ.addEventListener('change', applyMode);
+        progEl.addEventListener('change', function () { setTimeout(syncMode, 300); });
+        applyMode();
     })();
     </script>
 </body>
