@@ -62,8 +62,9 @@ and are referenced by repo-relative paths in the `.dest` file.
 Open `/controller`, pick Program → Service → Destination, then
 **Show on board**. The choice is saved to `board_state.json` and plays
 until the app restarts — every boot starts blank, so pick again after a
-reboot. Until anything is picked (fresh boot included) the panels stay
-blank. API:
+reboot. Switching destinations blanks the screen for 3s before showing
+the new one. Until anything is picked (fresh boot included) the panels
+stay blank. API:
 
 * `GET /api/board/state` — current selection + page count + speed
 * `POST /api/board/select {"program","service","destination"}`

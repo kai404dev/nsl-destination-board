@@ -418,6 +418,28 @@ def _read_selection() -> dict:
     return api.load_selection(ROOT)
 
 
+WIPE_SECONDS = 3.0  # blank pause when switching to a new destination
+
+
+def _wait_while_selected(seconds: float, sel: dict, previewing: bool = False) -> bool:
+    """Sleep up to *seconds*, waking early on selection/preview changes.
+
+    Returns True when something else cut in (new selection, or a preview
+    starting/stopping).
+    """
+    import api
+
+    waited = 0.0
+    while waited < seconds:
+        time.sleep(min(0.2, seconds - waited))
+        waited += 0.2
+        if (api.get_preview() is not None) != previewing:
+            return True
+        if _read_selection() != sel:
+            return True
+    return False
+
+
 def run_board(args) -> None:
     """Main player loop: render frames, push to matrix, follow state file."""
     import api
@@ -483,6 +505,12 @@ def run_board(args) -> None:
                 print(f"Board: playing {sel.get('program')} / "
                       f"{sel.get('service')} / {sel.get('destination')} "
                       f"({len(frames)} frames, {speed}s)")
+                # Transition wipe: clear the old screen for a beat so it
+                # never blends into the new destination.
+                print(f"Board: clearing screen for {WIPE_SECONDS:g}s")
+                matrix.Clear()
+                if _wait_while_selected(WIPE_SECONDS, sel):
+                    continue  # something else cut in; re-resolve
             last_key, idx = key, 0
             # Re-check the .dest file each switch; also reload cheaply
             # every full loop so studio edits appear without reselecting.
@@ -523,14 +551,9 @@ def run_board(args) -> None:
         except Exception as exc:  # keep the loop alive on bad frames
             print(f"Board: render error on frame {idx}: {exc}")
         idx += 1
-        # Sleep in small slices so a controller change cuts in quickly.
-        waited = 0.0
-        while waited < speed:
-            time.sleep(min(0.2, speed - waited))
-            waited += 0.2
-            if _read_selection() != sel:
-                idx = min(idx, max(0, len(frames) - 1))
-                break
+        # Sleep in small slices so a controller change (or preview) cuts in.
+        if _wait_while_selected(speed, sel):
+            idx = min(idx, max(0, len(frames) - 1))
 
 
 def main(argv=None) -> None:
