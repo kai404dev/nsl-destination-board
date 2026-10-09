@@ -1,0 +1,9 @@
+{
+  "defaults": {
+    "colour": "#DB9600",
+    "rotation_speed": 3,
+    "px_width": 240,
+    "px_height": 40
+  },
+  "services": {}
+}

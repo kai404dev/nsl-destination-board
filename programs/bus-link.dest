@@ -168,41 +168,6 @@
               "valign": "middle"
             },
             "destination": {
-              "text": "",
-              "font": "johnston100-33",
-              "colour": "#db9600",
-              "from_X": 0,
-              "to_X": 200,
-              "front_Y": 0,
-              "to_Y": 25,
-              "align": "center",
-              "valign": "middle"
-            },
-            "via": {
-              "text": "Trent Valley\nMorrisons, Stowe",
-              "font": "johnston100-21",
-              "colour": "#db9600",
-              "from_X": 0,
-              "to_X": 200,
-              "front_Y": 0,
-              "to_Y": 40,
-              "align": "center",
-              "valign": "middle"
-            }
-          },
-          "3:": {
-            "number": {
-              "text": "32",
-              "font": "johnston100-45",
-              "colour": "#db9600",
-              "from_X": 195,
-              "to_X": 240,
-              "front_Y": 0,
-              "to_Y": 40,
-              "align": "center",
-              "valign": "middle"
-            },
-            "destination": {
               "text": "Lichfield",
               "font": "johnston100-33",
               "colour": "#db9600",
@@ -220,6 +185,41 @@
               "from_X": 0,
               "to_X": 200,
               "front_Y": 25,
+              "to_Y": 40,
+              "align": "center",
+              "valign": "middle"
+            }
+          },
+          "4:": {
+            "number": {
+              "text": "32",
+              "font": "johnston100-45",
+              "colour": "#db9600",
+              "from_X": 195,
+              "to_X": 240,
+              "front_Y": 0,
+              "to_Y": 40,
+              "align": "center",
+              "valign": "middle"
+            },
+            "destination": {
+              "text": "",
+              "font": "johnston100-33",
+              "colour": "#db9600",
+              "from_X": 0,
+              "to_X": 200,
+              "front_Y": 0,
+              "to_Y": 25,
+              "align": "center",
+              "valign": "middle"
+            },
+            "via": {
+              "text": "Trent Valley\nMorrisons, Stowe",
+              "font": "johnston100-21",
+              "colour": "#db9600",
+              "from_X": 0,
+              "to_X": 200,
+              "front_Y": 0,
               "to_Y": 40,
               "align": "center",
               "valign": "middle"

@@ -13,7 +13,11 @@
         <span class="bdf-status" id="bdf-status"></span>
         <button id="bdf-save" class="btn-primary" type="button">Save glyph</button>
     </div>
-    <div class="bdf-cols">
+    <div class="bdf-subtabs" role="tablist" aria-label="Font views">
+        <button type="button" data-ftab="editor" class="active">Glyph editor</button>
+        <button type="button" data-ftab="overview">All sizes overview</button>
+    </div>
+    <div class="bdf-cols" id="bdf-editor-view">
         <div class="bdf-map" id="bdf-map"></div>
         <div class="bdf-edit">
             <h3 id="bdf-glyph-name">–</h3>
@@ -32,5 +36,25 @@
             </label>
             <canvas id="bdf-strip" width="240" height="40"></canvas>
         </div>
+    </div>
+    <div id="bdf-overview-view" hidden>
+        <div class="bdf-overview-bar">
+            <label>Preview text
+                <input type="text" id="bdf-overview-text"
+                    value="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+                    title="Long strings are split into A–Z / a–z / 0–9 rows">
+            </label>
+            <label class="bdf-overview-scale">Zoom
+                <select id="bdf-overview-scale">
+                    <option value="1">1×</option>
+                    <option value="2" selected>2×</option>
+                    <option value="3">3×</option>
+                    <option value="4">4×</option>
+                </select>
+            </label>
+            <button id="bdf-overview-reload" type="button">Reload</button>
+            <span class="bdf-status" id="bdf-overview-status"></span>
+        </div>
+        <div id="bdf-overview-grid"></div>
     </div>
 </div>

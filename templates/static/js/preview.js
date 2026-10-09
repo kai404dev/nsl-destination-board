@@ -60,8 +60,17 @@
                 if (cur.enc >= 0) glyphs[cur.enc] = cur;
                 cur = null;
             } else if (bitmap) {
-                var row = parseInt(line.trim(), 16);
-                if (!isNaN(row)) cur.rows.push(row);
+                // NOTE: rows are stored as bit arrays (not ints) because
+                // BDF rows wider than 32px overflow JS 32-bit bitwise ops.
+                var hex = line.trim();
+                var bits = [];
+                for (var b = 0; b < hex.length; b++) {
+                    var nibble = parseInt(hex.charAt(b), 16);
+                    if (isNaN(nibble)) { bits = null; break; }
+                    bits.push((nibble >> 3) & 1, (nibble >> 2) & 1,
+                        (nibble >> 1) & 1, nibble & 1);
+                }
+                if (bits) cur.rows.push(bits.slice(0, cur.w));
             }
         }
         return { glyphs: glyphs, ascent: ascent, descent: descent };
@@ -122,12 +131,11 @@
                 pen += 4; // missing glyph: fixed advance, like a space
                 continue;
             }
-            var stride = Math.ceil(glyph.w / 8);
             for (var r = 0; r < glyph.rows.length; r++) {
-                var row = glyph.rows[r];
+                var bits = glyph.rows[r];
                 var y = baseline - glyph.yoff - glyph.h + r;
                 for (var c = 0; c < glyph.w; c++) {
-                    if (row & (1 << (stride * 8 - 1 - c))) {
+                    if (bits[c]) {
                         ctx.fillRect(pen + glyph.xoff + c, y, 1, 1);
                     }
                 }

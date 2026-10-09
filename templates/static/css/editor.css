@@ -461,6 +461,134 @@
     margin-top: 0.4rem;
 }
 
+/* Font views sub-tabs (editor / overview). */
+.bdf-subtabs {
+    display: flex;
+    gap: 0.4rem;
+    margin-top: 1rem;
+}
+
+.bdf-subtabs button {
+    padding: 0.4rem 0.9rem;
+    background: transparent;
+    color: var(--text, #f2f2f4);
+    border: 1px solid var(--border, #2c2c33);
+    border-radius: 8px;
+    cursor: pointer;
+    font: inherit;
+}
+
+.bdf-subtabs button:hover {
+    border-color: var(--accent, #db9600);
+}
+
+.bdf-subtabs button.active {
+    background: var(--accent, #db9600);
+    border-color: var(--accent, #db9600);
+    color: var(--accent-text, #141414);
+    font-weight: 600;
+}
+
+/* All-sizes overview grid. */
+#bdf-overview-view {
+    margin-top: 1rem;
+}
+
+.bdf-overview-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.bdf-overview-bar label {
+    flex: 1 1 320px;
+    margin: 0;
+}
+
+.bdf-overview-bar input {
+    width: 100%;
+}
+
+.bdf-overview-scale {
+    flex: 0 0 auto;
+}
+
+.bdf-overview-scale select {
+    min-height: 44px;
+    margin-left: 0.4rem;
+    background: #141416;
+    color: var(--text, #f2f2f4);
+    border: 1px solid var(--border, #2c2c33);
+    border-radius: 8px;
+    font: inherit;
+    padding: 0.4rem 0.6rem;
+}
+
+.bdf-overview-bar button {
+    min-height: 44px;
+    padding: 0.4rem 1rem;
+    background: transparent;
+    color: var(--text, #f2f2f4);
+    border: 1px solid var(--border, #2c2c33);
+    border-radius: 8px;
+    cursor: pointer;
+    font: inherit;
+    font-weight: 600;
+}
+
+.bdf-overview-bar button:hover {
+    border-color: var(--accent, #db9600);
+}
+
+#bdf-overview-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.bdf-overview-font h3 {
+    margin: 0.5rem 0;
+    font-size: 1rem;
+}
+
+.bdf-overview-row {
+    border-top: 1px solid var(--border, #2c2c33);
+    padding-top: 0.4rem;
+}
+
+.bdf-overview-row .row-head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    color: var(--muted, #a7a7b3);
+    font-size: 0.95rem;
+    margin-bottom: 0.35rem;
+}
+
+.bdf-overview-row .row-head strong {
+    font-size: 1.05rem;
+    color: var(--text, #f2f2f4);
+}
+
+.bdf-overview-scroll {
+    overflow-x: auto;
+    padding-bottom: 0.3rem;
+}
+
+.bdf-overview-row canvas {
+    display: block;
+    width: auto;
+    max-width: none;
+    height: auto;
+    background: #000;
+    border: 1px solid var(--border, #2c2c33);
+    border-radius: 8px;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+}
+
 /* Mobile: preview on top, controls below, everything full width. */
 @media (max-width: 700px) {
     .content {
