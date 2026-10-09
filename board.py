@@ -368,7 +368,7 @@ def add_matrix_args(parser: argparse.ArgumentParser) -> None:
     g.add_argument("--led-chain", type=int, default=3,
                    help="panels in one chain; width = cols*chain (default 3 -> 240 wide)")
     g.add_argument("--led-parallel", type=int, default=1)
-    g.add_argument("--led-brightness", type=int, default=60)
+    g.add_argument("--led-brightness", type=int, default=70)
     g.add_argument("--led-gpio-mapping", default="regular",
                    help="regular | adafruit-hat | adafruit-hat-pwm")
     g.add_argument("--led-slowdown-gpio", type=int, default=4,
