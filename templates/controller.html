@@ -664,7 +664,11 @@
             'mode-f2': fPrev,
             'mode-f3': function () { D.page++; renderModePreview(); },
             'mode-f4': fNext,
-            'mode-f5': function () { D.buffer = ''; updateCodeReadout(); }
+            'mode-f5': function () {
+                D.buffer = '';
+                setLCD('', '', '', '');
+                modeCaption('Display cleared.');
+            }
         };
         Object.keys(fmap).forEach(function (id) {
             var btn = document.getElementById(id);
