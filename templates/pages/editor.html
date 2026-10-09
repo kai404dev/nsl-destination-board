@@ -1,0 +1,172 @@
+<div class="content">
+    <div class="display-wrap">
+        <div class="display">
+            <canvas id="sign-canvas" width="720" height="120"></canvas>
+        </div>
+        <div class="save-status">Autosave on</div>
+    </div>
+    <div class="side-bar">
+        <div class="tabs">
+            <div class="tab">
+                <button>Design</button>
+            </div>
+            <div class="tab">
+                <button>Pages</button>
+            </div>
+            <div class="tab">
+                <button>Save</button>
+            </div>
+        </div>
+        <div class="tab-pages">
+            <div class="tab-page" id="design">
+                <div class="sign-details">
+                    <div class="sign-text">
+                        <input type="text" placeholder="Route Number" id="route-number">
+                        <input type="text" placeholder="Destination" id="sign-destination">
+                        <textarea placeholder="Via" id="sign-via"></textarea>
+                    </div>
+                    <div class="sign-attributes">
+                        <label for="sign-layout">Layout</label>
+                        <select id="sign-layout">
+                            <option value="top">Top via</option>
+                            <option value="bottom" selected>Bottom via</option>
+                            <option value="left">Left via</option>
+                            <option value="right">Right via</option>
+                            <option value="none">No via</option>
+                        </select>
+                        <label class="check-row"><input type="checkbox" id="show-guides"> Show containers</label>
+                        <label class="check-row"><input type="checkbox" id="show-dots" checked> Pixel overlay</label>
+                        <div class="tabs">
+                            <div class="tab">
+                                <button>Number</button>
+                            </div>
+                            <div class="tab">
+                                <button>Destination</button>
+                            </div>
+                            <div class="tab">
+                                <button>Via</button>
+                            </div>
+                        </div>
+                        <div class="tab-pages">
+                            <div class="tab-page" id="number">
+                                <label for="number-font">Font</label>
+                                <select id="number-font">
+                                    <option>Loading fonts…</option>
+                                </select>
+                                <label for="number-size">Size</label>
+                                <select id="number-size">
+                                    <option>Select a font first</option>
+                                </select>
+                                <label for="number-color">Colour</label>
+                                <input type="color" id="number-color" value="#db9600">
+                                <div class="pos pos-number">
+                                    <h3>Position</h3>
+                                    <div class="pos-grid">
+                                        <label>X<input type="number" id="number-x" min="0" max="240"></label>
+                                        <label>Y<input type="number" id="number-y" min="0" max="40"></label>
+                                        <label>W<input type="number" id="number-w" min="1" max="240"></label>
+                                        <label>H<input type="number" id="number-h" min="1" max="40"></label>
+                                        <label>Align
+                                            <select id="number-align">
+                                                <option value="left">Left</option>
+                                                <option value="center" selected>Center</option>
+                                                <option value="right">Right</option>
+                                            </select>
+                                        </label>
+                                        <label>Valign
+                                            <select id="number-valign">
+                                                <option value="top">Top</option>
+                                                <option value="middle" selected>Middle</option>
+                                                <option value="bottom">Bottom</option>
+                                            </select>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="tab-page" id="destination">
+                                <label for="dest-font">Font</label>
+                                <select id="dest-font">
+                                    <option>Loading fonts…</option>
+                                </select>
+                                <label for="dest-size">Size</label>
+                                <select id="dest-size">
+                                    <option>Select a font first</option>
+                                </select>
+                                <label for="dest-color">Colour</label>
+                                <input type="color" id="dest-color" value="#db9600">
+                                <div class="pos pos-destination">
+                                    <h3>Position</h3>
+                                    <div class="pos-grid">
+                                        <label>X<input type="number" id="dest-x" min="0" max="240"></label>
+                                        <label>Y<input type="number" id="dest-y" min="0" max="40"></label>
+                                        <label>W<input type="number" id="dest-w" min="1" max="240"></label>
+                                        <label>H<input type="number" id="dest-h" min="1" max="40"></label>
+                                        <label>Align
+                                            <select id="dest-align">
+                                                <option value="left">Left</option>
+                                                <option value="center" selected>Center</option>
+                                                <option value="right">Right</option>
+                                            </select>
+                                        </label>
+                                        <label>Valign
+                                            <select id="dest-valign">
+                                                <option value="top">Top</option>
+                                                <option value="middle" selected>Middle</option>
+                                                <option value="bottom">Bottom</option>
+                                            </select>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="tab-page" id="via">
+                                <label for="via-font">Font</label>
+                                <select id="via-font">
+                                    <option>Loading fonts…</option>
+                                </select>
+                                <label for="via-size">Size</label>
+                                <select id="via-size">
+                                    <option>Select a font first</option>
+                                </select>
+                                <label for="via-color">Colour</label>
+                                <input type="color" id="via-color" value="#db9600">
+                                <div class="pos pos-via">
+                                    <h3>Position</h3>
+                                    <div class="pos-grid">
+                                        <label>X<input type="number" id="via-x" min="0" max="240"></label>
+                                        <label>Y<input type="number" id="via-y" min="0" max="40"></label>
+                                        <label>W<input type="number" id="via-w" min="1" max="240"></label>
+                                        <label>H<input type="number" id="via-h" min="1" max="40"></label>
+                                        <label>Align
+                                            <select id="via-align">
+                                                <option value="left">Left</option>
+                                                <option value="center" selected>Center</option>
+                                                <option value="right">Right</option>
+                                            </select>
+                                        </label>
+                                        <label>Valign
+                                            <select id="via-valign">
+                                                <option value="top">Top</option>
+                                                <option value="middle" selected>Middle</option>
+                                                <option value="bottom">Bottom</option>
+                                            </select>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="tab-page" id="pages">
+                <h2>Pages</h2>
+                <p>Manage your pages here.</p>
+            </div>
+            <div class="tab-page" id="save">
+                <h2>Save</h2>
+                <p>Your work autosaves to this browser as you type, so reloading never loses it.</p>
+                <div id="page-link"></div>
+                <button id="clear-draft" class="btn-danger" type="button">Clear draft</button>
+            </div>
+        </div>
+    </div>
+</div>

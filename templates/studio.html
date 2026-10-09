@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editor | NSL Board Poral</title>
+    <link rel="stylesheet" href="/static/css/portal.css">
+    <link rel="stylesheet" href="/static/css/editor.css">
+</head>
+<body>
+    <header class="topbar">
+        <a class="brand" href="/">NSL Board</a>
+        <span class="topbar-title">Sign Studio</span>
+    </header>
+    <div class="tabs" id="studio-tabs">
+        <div class="tab">
+            <button data-view="editor" class="active">Editor</button>
+        </div>
+        <div class="tab">
+            <button data-view="program">Program</button>
+        </div>
+    </div>
+    <div class="contenter" id="contenter">
+        <!-- Editor / Program will be loaded here via JS -->
+    </div>
+    <script src="/static/js/tabs.js"></script>
+    <script src="/static/js/studio.js"></script>
+    <script src="/static/js/preview.js"></script>
+    <script src="/static/js/editor.js"></script>
+    <script src="/static/js/program.js"></script>
+</body>
+</html>

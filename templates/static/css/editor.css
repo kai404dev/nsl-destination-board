@@ -1,0 +1,227 @@
+/* Sign studio editor - layout for the editor partial. Flat, no cards. */
+
+.content {
+    flex: 1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    align-items: flex-start;
+    align-content: flex-start;
+    min-height: 0;
+}
+
+/* Sticky preview column */
+.display-wrap {
+    flex: 1 1 480px;
+    width: 100%;
+    min-width: 0;
+    position: sticky;
+    top: 4.5rem;
+}
+
+/* Live 240x40 board preview. The canvas holds the real pixels; CSS just
+   scales it up with crisp edges. */
+.display {
+    width: 100%;
+    padding: 0;
+    background: #000;
+    border: 1px solid #2c2c33;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+#sign-canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 6 / 1;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+}
+
+.side-bar {
+    flex: 1 1 300px;
+    width: 100%;
+    min-width: 0;
+}
+
+.sign-text {
+    display: grid;
+    gap: 0.6rem;
+    margin-bottom: 1rem;
+}
+
+.sign-attributes .tabs {
+    margin-top: 1rem;
+}
+
+.tab-pages {
+    border-top: 1px solid var(--border, #2c2c33);
+    padding-top: 0.5rem;
+}
+
+.tab-page {
+    padding-top: 0.5rem;
+}
+
+.tab-page h2 {
+    font-size: 1.05rem;
+}
+
+/* Per-element position controls */
+.pos {
+    margin-top: 1rem;
+}
+
+.pos h3 {
+    margin: 0 0 0.4rem;
+    font-size: 0.85rem;
+    color: var(--muted, #a7a7b3);
+}
+
+.pos-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.4rem 0.6rem;
+}
+
+.pos-grid label {
+    margin: 0;
+}
+
+/* Container colour coding matches the guide outlines on the preview */
+.pos-number h3 {
+    color: #4da3ff;
+}
+
+.pos-destination h3 {
+    color: #db9600;
+}
+
+.pos-via h3 {
+    color: #46c46a;
+}
+
+/* Program tab: picker bar, destination list, add form. Flat, no cards. */
+.program {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.prog-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.75rem;
+}
+
+.prog-pick {
+    flex: 1 1 200px;
+    margin: 0;
+}
+
+.prog-status {
+    flex: 1 1 auto;
+    color: var(--muted, #a7a7b3);
+    font-size: 0.85rem;
+    padding-bottom: 0.6rem;
+}
+
+.service-key {
+    margin: 1rem 0 0.25rem;
+    font-size: 0.85rem;
+    color: var(--muted, #a7a7b3);
+}
+
+.service {
+    padding: 0.5rem 0;
+    border-top: 1px solid var(--border, #2c2c33);
+}
+
+.service-head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+}
+
+.service-head .code {
+    color: var(--muted, #a7a7b3);
+    font-size: 0.85rem;
+}
+
+.page-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.5rem;
+}
+
+.page-list button {
+    min-height: 44px;
+    padding: 0.4rem 0.8rem;
+    background: transparent;
+    color: var(--text, #f2f2f4);
+    border: 1px solid var(--border, #2c2c33);
+    border-radius: 8px;
+    cursor: pointer;
+    font: inherit;
+}
+
+.page-list button:hover {
+    border-color: var(--accent, #db9600);
+}
+
+.add-service h3 {
+    margin: 0 0 0.4rem;
+    font-size: 0.85rem;
+    color: var(--muted, #a7a7b3);
+}
+
+.add-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.4rem 0.6rem;
+    margin-bottom: 0.6rem;
+}
+
+.add-grid label {
+    margin: 0;
+}
+
+#page-link p {
+    color: var(--muted, #a7a7b3);
+    font-size: 0.9rem;
+}
+
+#page-link .btn-primary {
+    margin-right: 0.6rem;
+}
+
+.page-link-status {
+    color: var(--muted, #a7a7b3);
+    font-size: 0.85rem;
+}
+
+@media (max-width: 700px) {
+    .add-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Mobile: preview on top, controls below, everything full width. */
+@media (max-width: 700px) {
+    .content {
+        flex-direction: column;
+        flex-wrap: nowrap;
+    }
+
+    .display-wrap,
+    .side-bar {
+        flex: none;
+    }
+
+    .display-wrap {
+        position: static;
+    }
+}
