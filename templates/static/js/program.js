@@ -243,6 +243,37 @@
         render(root);
     }
 
+    function addProgram(root) {
+        var input = $(root, 'new-program');
+        var name = input ? input.value.trim() : '';
+        if (!name) {
+            setStatus(root, 'Type a program name first');
+            return;
+        }
+        setStatus(root, 'Creating…');
+        fetch('/api/programs', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: name })
+        })
+            .then(function (response) {
+                if (!response.ok) throw new Error(response.status === 409 ? 'exists' : 'HTTP ' + response.status);
+                return response.json();
+            })
+            .then(function (result) {
+                if (input) input.value = '';
+                S.name = result.name;
+                S.data = null;
+                S.dirty = false;
+                storeSet(SEL_KEY, S.name);
+                return refresh(root);
+            })
+            .catch(function (err) {
+                console.error(err);
+                setStatus(root, err.message === 'exists' ? 'Program already exists' : 'Could not create program');
+            });
+    }
+
     function addDestination(root) {
         var serviceEl = $(root, 'new-service');
         var nameEl = $(root, 'new-destination');
@@ -309,6 +340,7 @@
         if (!btn || !root.contains(btn)) return;
         var action = btn.dataset.action;
         if (action === 'save') doSave(root);
+        else if (action === 'add-program') addProgram(root);
         else if (action === 'add-page') addPage(root, btn.dataset.service, btn.dataset.destination);
         else if (action === 'add-destination') addDestination(root);
         else if (action === 'edit') editPage(root, btn.dataset.service, btn.dataset.destination, btn.dataset.page);

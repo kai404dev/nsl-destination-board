@@ -178,10 +178,59 @@
     }
 
     function applyPreset(root, layout) {
-        var preset = LAYOUT_PRESETS[layout] || LAYOUT_PRESETS.top;
+        var preset = LAYOUT_PRESETS[layout] || LAYOUT_PRESETS.bottom;
         GROUPS.forEach(function (group) {
             setBox(root, group, preset[group.key]);
         });
+    }
+
+    // Smart layout: rearrange boxes for the new layout, moving as little as
+    // possible. Widths/heights are never touched - only x/y.
+    function applySmartLayout(root, layout) {
+        var boxes = {};
+        GROUPS.forEach(function (group) {
+            var fb = DEFAULTS.styles[group.key].box;
+            boxes[group.key] = {
+                x: num(root, group.xId, 0, 239, fb.x),
+                y: num(root, group.yId, 0, 39, fb.y),
+                w: num(root, group.wId, 1, 240, fb.w),
+                h: num(root, group.hId, 1, 40, fb.h)
+            };
+        });
+        var number = boxes.number;
+        var dest = boxes.destination;
+        var via = boxes.via;
+
+        if (layout === 'left') {
+            number.x = 0;
+            var edge = number.x + number.w + 2;
+            if (dest.x < edge) dest.x = Math.min(edge, 240 - dest.w);
+            if (via.x < edge) via.x = Math.min(edge, 240 - via.w);
+        } else if (layout === 'top' || layout === 'right') {
+            number.x = Math.max(0, 240 - number.w);
+            stackAbove(via, dest); // via above dest
+        } else if (layout === 'bottom') {
+            number.x = Math.max(0, 240 - number.w);
+            stackAbove(dest, via); // dest above via
+        }
+        // 'none': leave everything where it is (via just isn't drawn)
+
+        GROUPS.forEach(function (group) {
+            setBox(root, group, boxes[group.key]);
+        });
+    }
+
+    // Place `top` directly above `bottom`, keeping both sizes. Anchors on
+    // `bottom` unless that would push `top` off-screen.
+    function stackAbove(top, bottom) {
+        top.y = bottom.y - top.h;
+        if (top.y < 0) {
+            top.y = 0;
+            bottom.y = top.h;
+        }
+        if (bottom.y + bottom.h > 40) {
+            bottom.y = 40 - bottom.h;
+        }
     }
 
     function setVal(root, id, value) {
@@ -389,6 +438,227 @@
             });
     }
 
+    function esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (ch) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
+        });
+    }
+
+    function blankPageElements() {
+        return {
+            number: { text: '', font: 'johnston100-45', colour: '#db9600', from_X: 210, to_X: 240, front_Y: 0, to_Y: 40 },
+            destination: { text: '', font: 'johnston100-33', colour: '#db9600', from_X: 0, to_X: 220, front_Y: 0, to_Y: 26 },
+            via: { text: '', font: 'johnston100-20', colour: '#db9600', from_X: 0, to_X: 220, front_Y: 26, to_Y: 40 }
+        };
+    }
+
+    function nextPageKey(text) {
+        var max = -1;
+        Object.keys(text || {}).forEach(function (k) {
+            var m = /^(\d+):?$/.exec(k);
+            if (m) max = Math.max(max, parseInt(m[1], 10));
+        });
+        return (max + 1) + ':';
+    }
+
+    function splitFontName(f) {
+        var s = String(f || '');
+        var i = s.lastIndexOf('-');
+        if (i < 0) return { name: s, size: '' };
+        return { name: s.slice(0, i), size: s.slice(i + 1) };
+    }
+
+    function numOr(v, fallback) {
+        var n = parseInt(v, 10);
+        return isNaN(n) ? fallback : n;
+    }
+
+    var LINK_FALLBACK_BOXES = {
+        number: { x: 210, y: 0, w: 30, h: 40 },
+        destination: { x: 0, y: 0, w: 220, h: 26 },
+        via: { x: 0, y: 26, w: 220, h: 14 }
+    };
+
+    function styleFromPage(el, fb) {
+        el = el || {};
+        var split = splitFontName(el.font);
+        var y = numOr(el.front_Y != null ? el.front_Y : el.from_Y, fb.y);
+        var x = numOr(el.from_X, fb.x);
+        var w = numOr(el.to_X, fb.x + fb.w) - x;
+        var h = numOr(el.to_Y, fb.y + fb.h) - y;
+        return {
+            font: split.name, size: split.size,
+            color: el.colour || '#db9600',
+            align: 'center', valign: 'middle',
+            box: {
+                x: Math.max(0, Math.min(239, x)),
+                y: Math.max(0, Math.min(39, y)),
+                w: w >= 1 && w <= 240 ? w : fb.w,
+                h: h >= 1 && h <= 40 ? h : fb.h
+            }
+        };
+    }
+
+    function draftFromPage(page) {
+        return {
+            v: 1,
+            route: ((page.number || {}).text) || '',
+            destination: ((page.destination || {}).text) || '',
+            via: ((page.via || {}).text) || '',
+            layout: 'bottom',
+            guides: false,
+            dots: true,
+            outerTab: 0,
+            innerTab: 0,
+            styles: {
+                number: styleFromPage(page.number, LINK_FALLBACK_BOXES.number),
+                destination: styleFromPage(page.destination, LINK_FALLBACK_BOXES.destination),
+                via: styleFromPage(page.via, LINK_FALLBACK_BOXES.via)
+            },
+            updatedAt: Date.now()
+        };
+    }
+
+    function fetchProgram(name) {
+        return fetch('/api/programs/' + encodeURIComponent(name)).then(function (response) {
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            return response.json();
+        });
+    }
+
+    function linkedDestination(prog, ctx) {
+        var dest = prog.services && prog.services[ctx.service] && prog.services[ctx.service][ctx.destination];
+        return (dest && dest.text && typeof dest.text === 'object') ? dest : null;
+    }
+
+    function sortedPageKeys(text) {
+        return Object.keys(text).sort(function (a, b) {
+            function n(k) {
+                var m = /^(\d+)/.exec(k);
+                return m ? parseInt(m[1], 10) : 9999;
+            }
+            return n(a) - n(b) || (a < b ? -1 : a > b ? 1 : 0);
+        });
+    }
+
+    function renderPages(root) {
+        var list = root.querySelector('#pages-list');
+        var addBtn = root.querySelector('#add-page');
+        if (!list) return;
+        var ctx = loadCtx();
+        if (!ctx || !ctx.program) {
+            list.innerHTML = '<p class="muted">Open a page from the Program tab to manage its pages here.</p>';
+            if (addBtn) addBtn.hidden = true;
+            return;
+        }
+        if (addBtn) addBtn.hidden = false;
+        list.innerHTML = '<p class="muted">Loading…</p>';
+        fetchProgram(ctx.program)
+            .then(function (prog) {
+                var dest = linkedDestination(prog, ctx);
+                if (!dest) {
+                    list.innerHTML = '<p class="muted">Destination no longer exists.</p>';
+                    return;
+                }
+                var keys = sortedPageKeys(dest.text);
+                if (!keys.length) {
+                    list.innerHTML = '<p class="muted">No pages yet.</p>';
+                    return;
+                }
+                var html = '<div class="page-list">';
+                keys.forEach(function (key) {
+                    var d = ((dest.text[key] || {}).destination || {}).text || '';
+                    var current = key === ctx.page;
+                    html += '<button type="button" data-page="' + esc(key) + '"' +
+                        (current ? ' class="active" disabled' : '') + '>' +
+                        esc(key + (d ? ' ' + d : '')) + '</button>';
+                });
+                list.innerHTML = html + '</div>';
+            })
+            .catch(function (err) {
+                console.error(err);
+                list.innerHTML = '<p class="muted">Could not load pages.</p>';
+            });
+    }
+
+    function loadLinkedPage(root, pageKey) {
+        var ctx = loadCtx();
+        if (!ctx || !ctx.program) return Promise.resolve();
+        setStatus(root, 'Loading page…');
+        return fetchProgram(ctx.program)
+            .then(function (prog) {
+                var dest = linkedDestination(prog, ctx);
+                var page = dest && dest.text[pageKey];
+                if (!page) throw new Error('page no longer exists');
+                var draft = draftFromPage(page);
+                // Stay on the tabs the user already has open.
+                draft.outerTab = activeIndex(root, '.side-bar > .tabs');
+                draft.innerTab = activeIndex(root, '.sign-attributes > .tabs');
+                applyState(root, draft);
+                try {
+                    localStorage.setItem(CTX_KEY, JSON.stringify({
+                        program: ctx.program, service: ctx.service,
+                        destination: ctx.destination, page: pageKey
+                    }));
+                } catch (err) { /* ignore */ }
+                renderPreview(root);
+                renderPageLink(root);
+                renderPages(root);
+                return loadFonts(root);
+            })
+            .then(function () {
+                renderPreview(root);
+                save(root);
+            })
+            .catch(function (err) {
+                console.error(err);
+                setStatus(root, 'Could not load page');
+            });
+    }
+
+    function addLinkedPage(root) {
+        var ctx = loadCtx();
+        if (!ctx || !ctx.program) return;
+        setStatus(root, 'Adding page…');
+        var freshText = null;
+        fetchProgram(ctx.program)
+            .then(function (prog) {
+                var dest = linkedDestination(prog, ctx);
+                if (!dest) throw new Error('destination no longer exists');
+                var key = nextPageKey(dest.text);
+                dest.text[key] = blankPageElements();
+                freshText = dest.text;
+                return fetch('/api/programs/' + encodeURIComponent(ctx.program), {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(prog)
+                }).then(function (put) {
+                    if (!put.ok) throw new Error('HTTP ' + put.status);
+                    return key;
+                });
+            })
+            .then(function (key) {
+                // Keep the Program tab's unsaved working copy in sync.
+                try {
+                    var raw = localStorage.getItem('nsl.programDraft.' + ctx.program);
+                    if (raw) {
+                        var working = JSON.parse(raw);
+                        var dest = working.services && working.services[ctx.service] &&
+                            working.services[ctx.service][ctx.destination];
+                        if (dest) {
+                            dest.text = freshText;
+                            localStorage.setItem('nsl.programDraft.' + ctx.program, JSON.stringify(working));
+                        }
+                    }
+                } catch (err) { /* ignore */ }
+                return loadLinkedPage(root, key);
+            })
+            .catch(function (err) {
+                console.error(err);
+                setStatus(root, 'Could not add page');
+            });
+    }
+
     function doClear(root) {
         try {
             localStorage.removeItem(STORAGE_KEY);
@@ -449,6 +719,7 @@
         applyState(root, draft || DEFAULTS);
         renderPreview(root);
         renderPageLink(root);
+        renderPages(root);
         loadFonts(root).then(function () {
             renderPreview(root);
             if (draft) {
@@ -487,7 +758,11 @@
                 loadSizes(root, group).then(function () { renderPreview(root); save(root); });
                 return;
             }
-            // Layout changes never touch custom positions; boxes are manual.
+            // Layout rearranges positions, but never resizes: widths/heights
+            // are always preserved, only x/y move - and only if needed.
+            if (t.id === 'sign-layout') {
+                applySmartLayout(root, t.value);
+            }
             scheduleSave();
         });
         root.addEventListener('change', scheduleSave);
@@ -498,6 +773,16 @@
             var clear = event.target.closest ? event.target.closest('#clear-draft') : null;
             if (clear) {
                 doClear(root);
+                return;
+            }
+            var pageBtn = event.target.closest ? event.target.closest('#pages-list [data-page]') : null;
+            if (pageBtn && !pageBtn.disabled) {
+                loadLinkedPage(root, pageBtn.dataset.page);
+                return;
+            }
+            var addPageBtn = event.target.closest ? event.target.closest('#add-page') : null;
+            if (addPageBtn) {
+                addLinkedPage(root);
                 return;
             }
             // Persist tab switches too (runs after the tabs.js handler).

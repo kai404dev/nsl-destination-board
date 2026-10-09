@@ -47,6 +47,10 @@ a {
     color: var(--accent);
 }
 
+.muted {
+    color: var(--muted);
+}
+
 ::placeholder {
     color: #6e6e78;
 }
