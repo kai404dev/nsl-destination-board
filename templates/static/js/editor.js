@@ -110,6 +110,7 @@
             destination: val(root, 'sign-destination'),
             via: val(root, 'sign-via'),
             layout: val(root, 'sign-layout') || 'bottom',
+            numberSide: val(root, 'number-side') || 'right',
             guides: !!(guidesEl && guidesEl.checked),
             dots: !dotsEl || dotsEl.checked,
             outerTab: activeIndex(root, '.side-bar > .tabs'),
@@ -147,6 +148,15 @@
         setVal(root, 'sign-destination', state.destination);
         setVal(root, 'sign-via', state.via);
         setVal(root, 'sign-layout', state.layout);
+        // Older drafts predate the Number side control - infer it from the
+        // number box so the control reflects what is on screen.
+        var side = state.numberSide;
+        if (side !== 'left' && side !== 'right') {
+            var nbox = ((state.styles || {}).number || {}).box
+                || DEFAULTS.styles.number.box;
+            side = (nbox.x + nbox.w / 2 < 120) ? 'left' : 'right';
+        }
+        setVal(root, 'number-side', side);
         var guidesEl = $(root, 'show-guides');
         if (guidesEl) guidesEl.checked = !!state.guides;
         var dotsEl = $(root, 'show-dots');
@@ -187,16 +197,7 @@
     // Smart layout: rearrange boxes for the new layout, moving as little as
     // possible. Widths/heights are never touched - only x/y.
     function applySmartLayout(root, layout) {
-        var boxes = {};
-        GROUPS.forEach(function (group) {
-            var fb = DEFAULTS.styles[group.key].box;
-            boxes[group.key] = {
-                x: num(root, group.xId, 0, 239, fb.x),
-                y: num(root, group.yId, 0, 39, fb.y),
-                w: num(root, group.wId, 1, 240, fb.w),
-                h: num(root, group.hId, 1, 40, fb.h)
-            };
-        });
+        var boxes = readBoxes(root);
         var number = boxes.number;
         var dest = boxes.destination;
         var via = boxes.via;
@@ -215,9 +216,51 @@
         }
         // 'none': leave everything where it is (via just isn't drawn)
 
+        writeBoxes(root, boxes);
+    }
+
+    function readBoxes(root) {
+        var boxes = {};
+        GROUPS.forEach(function (group) {
+            var fb = DEFAULTS.styles[group.key].box;
+            boxes[group.key] = {
+                x: num(root, group.xId, 0, 239, fb.x),
+                y: num(root, group.yId, 0, 39, fb.y),
+                w: num(root, group.wId, 1, 240, fb.w),
+                h: num(root, group.hId, 1, 40, fb.h)
+            };
+        });
+        return boxes;
+    }
+
+    function writeBoxes(root, boxes) {
         GROUPS.forEach(function (group) {
             setBox(root, group, boxes[group.key]);
         });
+    }
+
+    // Number side: pin the route number to the left or right edge and make
+    // room for it, moving destination/via only as far as needed. Sizes and
+    // y positions are never touched, and it is independent of Layout.
+    function applyNumberSide(root, side) {
+        var boxes = readBoxes(root);
+        var number = boxes.number;
+        var others = [boxes.destination, boxes.via];
+
+        if (side === 'left') {
+            number.x = 0;
+            var edge = number.x + number.w + 2;
+            others.forEach(function (b) {
+                if (b.x < edge) b.x = Math.min(edge, 240 - b.w);
+            });
+        } else {
+            number.x = Math.max(0, 240 - number.w);
+            others.forEach(function (b) {
+                if (b.x + b.w > number.x) b.x = Math.max(0, number.x - b.w);
+            });
+        }
+
+        writeBoxes(root, boxes);
     }
 
     // Place `top` directly above `bottom`, keeping both sizes. Anchors on
@@ -525,7 +568,8 @@
             route: ((page.number || {}).text) || '',
             destination: ((page.destination || {}).text) || '',
             via: ((page.via || {}).text) || '',
-            layout: 'bottom',
+        layout: 'bottom',
+        numberSide: 'right',
             guides: false,
             dots: true,
             outerTab: 0,
@@ -800,6 +844,7 @@
         setVal(root, 'sign-destination', '');
         setVal(root, 'sign-via', '');
         setVal(root, 'sign-layout', 'bottom');
+        setVal(root, 'number-side', 'right');
         var guidesEl = $(root, 'show-guides');
         if (guidesEl) guidesEl.checked = false;
         var dotsEl = $(root, 'show-dots');
@@ -955,6 +1000,8 @@
             // are always preserved, only x/y move - and only if needed.
             if (t.id === 'sign-layout') {
                 applySmartLayout(root, t.value);
+            } else if (t.id === 'number-side') {
+                applyNumberSide(root, t.value);
             }
             scheduleSave();
         });
