@@ -282,6 +282,65 @@ SELECTION_FILE = "board_state.json"
 # immediately - it just won't remember across reboots.
 _memory_selection: dict | None = None
 
+# Live preview: one editor page pushed to the board temporarily.
+# {page, width, height, expires}. In-memory only - never persisted.
+_preview: dict | None = None
+PREVIEW_MIN_SECONDS = 5
+PREVIEW_MAX_SECONDS = 300
+PREVIEW_DEFAULT_SECONDS = 60
+
+
+def _valid_preview_page(page) -> bool:
+    if not isinstance(page, dict):
+        return False
+    for key in ("number", "destination", "via"):
+        el = page.get(key)
+        if el is not None and not isinstance(el, dict):
+            return False
+    return any((page.get(k) or {}).get("text") for k in ("number", "destination", "via"))
+
+
+def set_preview(page: dict, width: int = 240, height: int = 40,
+                seconds: int = PREVIEW_DEFAULT_SECONDS) -> tuple[bool, str]:
+    """Show one editor page on the board until it expires. Returns (ok, message)."""
+    import time as _time
+
+    if not _valid_preview_page(page):
+        return False, "page must have number/destination/via elements with text"
+    try:
+        width, height = int(width), int(height)
+    except (TypeError, ValueError):
+        width, height = 240, 40
+    width = max(1, min(1024, width))
+    height = max(1, min(256, height))
+    try:
+        seconds = int(seconds)
+    except (TypeError, ValueError):
+        seconds = PREVIEW_DEFAULT_SECONDS
+    seconds = max(PREVIEW_MIN_SECONDS, min(PREVIEW_MAX_SECONDS, seconds))
+    global _preview
+    _preview = {"page": page, "width": width, "height": height,
+                "expires": _time.monotonic() + seconds, "seconds": seconds}
+    return True, f"previewing for {seconds}s"
+
+
+def clear_preview() -> None:
+    global _preview
+    _preview = None
+
+
+def get_preview() -> dict | None:
+    """Return the active preview dict, or None (clearing it when expired)."""
+    import time as _time
+
+    global _preview
+    if _preview is None:
+        return None
+    if _time.monotonic() >= _preview["expires"]:
+        _preview = None
+        return None
+    return _preview
+
 
 def _sorted_service_keys(services: dict) -> list[str]:
     def key(k: str):

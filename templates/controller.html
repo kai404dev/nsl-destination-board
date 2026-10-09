@@ -106,6 +106,9 @@
                     } else {
                         nowEl.textContent = 'Board has nothing to play yet.';
                     }
+                    if (s.preview) {
+                        nowEl.textContent += ' — live editor preview on screen (pauses this).';
+                    }
                     infoEl.textContent = '';
                     // Preselect dropdowns to the live selection.
                     if (sel.program && progEl.querySelector('option[value="' + CSS.escape(sel.program) + '"]')) {

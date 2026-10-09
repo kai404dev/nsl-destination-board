@@ -847,6 +847,66 @@
         if (announce !== false) setStatus(root, 'Autosaved ' + fmtTime(state.updatedAt));
     }
 
+    function previewSay(root, text) {
+        var el = root.querySelector('#board-preview .preview-status');
+        if (el) el.textContent = text;
+    }
+
+    function showStop(root, show) {
+        var btn = root.querySelector('#stop-preview');
+        if (btn) btn.hidden = !show;
+        var start = root.querySelector('#preview-board');
+        if (start) start.disabled = !!show;
+    }
+
+    // Push the current draft to the physical board for 60s, exactly as the
+    // canvas preview shows it (same boxes, fonts, colours, alignment).
+    function startBoardPreview(root) {
+        var state = collectState(root);
+        previewSay(root, 'Sending to board…');
+        fetch('/api/board/preview', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                page: {
+                    number: pageElement(state.route, state.styles.number),
+                    destination: pageElement(state.destination, state.styles.destination),
+                    via: pageElement(state.via, state.styles.via)
+                },
+                width: 240,
+                height: 40,
+                seconds: 60
+            })
+        })
+            .then(function (response) {
+                return response.json().then(function (body) {
+                    return { ok: response.ok, body: body };
+                });
+            })
+            .then(function (res) {
+                if (!res.ok) throw new Error((res.body && res.body.error) || 'failed');
+                previewSay(root, 'On the board for 60s (pauses the normal display).');
+                showStop(root, true);
+            })
+            .catch(function (err) {
+                console.error(err);
+                previewSay(root, 'Preview failed: ' + err.message);
+            });
+    }
+
+    function stopBoardPreview(root) {
+        previewSay(root, 'Stopping…');
+        fetch('/api/board/preview', { method: 'DELETE' })
+            .then(function () {
+                previewSay(root, '');
+                showStop(root, false);
+            })
+            .catch(function (err) {
+                console.error(err);
+                previewSay(root, 'Stop failed');
+            });
+    }
+
     function refresh(root) {
         var draft = loadDraft();
         applyState(root, draft || DEFAULTS);
@@ -927,6 +987,16 @@
             var addPageBtn = event.target.closest ? event.target.closest('#add-page') : null;
             if (addPageBtn) {
                 addLinkedPage(root);
+                return;
+            }
+            var previewBtn = event.target.closest ? event.target.closest('#preview-board') : null;
+            if (previewBtn && !previewBtn.disabled) {
+                startBoardPreview(root);
+                return;
+            }
+            var stopBtn = event.target.closest ? event.target.closest('#stop-preview') : null;
+            if (stopBtn) {
+                stopBoardPreview(root);
                 return;
             }
             // Persist tab switches too (runs after the tabs.js handler).

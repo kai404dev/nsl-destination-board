@@ -20,6 +20,8 @@ Routes:
     /api/programs/<name>              -> GET/PUT/DELETE one .dest program
     /api/board/state                  -> GET current board selection + info
     /api/board/select                 -> POST {program,service,destination}
+    /api/board/preview                -> POST {page,width,height,seconds}
+                                       (live editor preview), DELETE to stop
     /fonts/<path>                     -> raw BDF font files (canvas preview)
 """
 
@@ -58,13 +60,15 @@ def _board_state_payload() -> dict:
     if program is None:
         return {"selection": sel, "valid": False, "pages": 0,
                 "rotation_speed": 3,
-                "services": [], "destinations": []}
+                "services": [], "destinations": [],
+                "preview": api.get_preview() is not None}
     services = api.list_services(program)
     destinations = api.list_destinations(program, sel.get("service") or "")
     if sel.get("service") not in services or sel.get("destination") not in destinations:
         return {"selection": sel, "valid": False, "pages": 0,
                 "rotation_speed": 3, "services": services,
-                "destinations": destinations}
+                "destinations": destinations,
+                "preview": api.get_preview() is not None}
     dest = ((program.get("services") or {}).get(sel.get("service") or "")
             or {}).get(sel.get("destination") or "")
     pages = 0
@@ -81,7 +85,8 @@ def _board_state_payload() -> dict:
         speed = 3
     return {"selection": sel, "valid": True, "pages": pages,
             "rotation_speed": speed, "services": services,
-            "destinations": destinations}
+            "destinations": destinations,
+            "preview": api.get_preview() is not None}
 
 # Explicit page routes: URL path -> template file (relative to TEMPLATE_DIR).
 PAGE_ROUTES = {
@@ -258,6 +263,11 @@ class BoardHandler(SimpleHTTPRequestHandler):
         if parsed.path.endswith("/") and url_path != "/":
             url_path += "/"
 
+        # Stop a live editor preview (board resumes its selection).
+        if url_path in ("/api/board/preview", "/api/board/preview/"):
+            api.clear_preview()
+            return self._serve_json({"ok": True})
+
         # Delete a .dest program file.
         if url_path.startswith("/api/programs/"):
             name = urllib.parse.unquote(url_path[len("/api/programs/"):].strip("/"))
@@ -274,6 +284,21 @@ class BoardHandler(SimpleHTTPRequestHandler):
         url_path = posixpath.normpath(parsed.path or "/")
         if parsed.path.endswith("/") and url_path != "/":
             url_path += "/"
+
+        # Live editor preview: POST {page,width,height,seconds}.
+        if url_path in ("/api/board/preview", "/api/board/preview/"):
+            data, error = self._read_json_body()
+            if error:
+                return self._serve_json({"error": error}, status=400)
+            if not isinstance(data, dict):
+                return self._serve_json({"error": "body must be JSON"}, status=400)
+            ok, message = api.set_preview(
+                data.get("page"),
+                data.get("width", 240), data.get("height", 40),
+                data.get("seconds", api.PREVIEW_DEFAULT_SECONDS))
+            if not ok:
+                return self._serve_json({"error": message}, status=400)
+            return self._serve_json({"ok": True, "message": message})
 
         # Create a new .dest program from the template: POST {"name": "..."}.
         if url_path in ("/api/programs", "/api/programs/"):
@@ -300,6 +325,7 @@ class BoardHandler(SimpleHTTPRequestHandler):
                 str(data.get("destination") or ""))
             if not ok:
                 return self._serve_json({"error": message}, status=400)
+            api.clear_preview()  # an explicit selection takes over
             payload = {"ok": True, **_board_state_payload()}
             if message != "saved":
                 payload["warning"] = message

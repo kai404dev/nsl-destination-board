@@ -66,6 +66,16 @@ no state file) the panels stay blank. API:
 
 * `GET /api/board/state` — current selection + page count + speed
 * `POST /api/board/select {"program","service","destination"}`
+* `POST /api/board/preview {"page","width","height","seconds"}` — live
+  editor preview (pauses the normal display, auto-resumes after expiry,
+  max 300s), `DELETE /api/board/preview` to stop early
+
+### Live preview from Sign Studio
+
+The editor's Save tab has **Preview on board**: pushes the current draft
+to the panels for 60s, exactly as the canvas shows it. The Controller
+shows when a preview is on screen; picking a program there (or Stop
+preview) takes over again.
 
 Portal only (no panels, e.g. designing from a laptop):
 

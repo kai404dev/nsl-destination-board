@@ -431,11 +431,33 @@ def run_board(args) -> None:
     matrix.Clear()  # blank screen until the Controller picks a destination
     last_key = None
     blank_notice_key = None  # last key we already logged a blank notice for
+    previewing = False
     frames: list = []
     program: dict | None = None
     speed = 3.0
     idx = 0
     while True:
+        preview = api.get_preview()
+        if preview is not None:
+            if not previewing:
+                print(f"Board: live preview ({preview['seconds']}s) - selection paused")
+                previewing = True
+            try:
+                img = render_text_page(preview["page"],
+                                       preview["width"], preview["height"])
+            except Exception as exc:
+                print(f"Board: preview render error: {exc}")
+                time.sleep(0.5)
+                continue
+            if img.size != (phys_w, phys_h):
+                img = img.resize((phys_w, phys_h), Image.NEAREST)
+            matrix.SetImage(img.convert("RGB"))
+            time.sleep(0.5)
+            continue
+        if previewing:
+            print("Board: preview ended - resuming selection")
+            previewing = False
+            last_key = None
         sel = _read_selection()
         key = (sel.get("program"), sel.get("service"), sel.get("destination"),
                args.panel_width)
