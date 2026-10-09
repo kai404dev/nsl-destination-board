@@ -109,6 +109,63 @@
     // Module state for the currently open program.
     var S = { name: '', data: null, dirty: false, lastSaved: 0 };
 
+    var TEMPLATE_DEFAULTS = {
+        colour: '#DB9600', rotation_speed: 3, px_width: 240, px_height: 40
+    };
+
+    // Older .dest files may lack `defaults` - merge the template in so the
+    // Defaults form always has something to show and save.
+    function ensureDefaults() {
+        if (!S.data || typeof S.data !== 'object') return null;
+        var d = S.data.defaults;
+        if (!d || typeof d !== 'object') {
+            d = {};
+            S.data.defaults = d;
+        }
+        Object.keys(TEMPLATE_DEFAULTS).forEach(function (k) {
+            if (d[k] === undefined || d[k] === null || d[k] === '') {
+                d[k] = TEMPLATE_DEFAULTS[k];
+            }
+        });
+        return d;
+    }
+
+    function setVal(root, id, value) {
+        var el = $(root, id);
+        if (el && value !== undefined && value !== null) el.value = value;
+    }
+
+    function fillDefaults(root) {
+        var d = ensureDefaults();
+        if (!d) return;
+        setVal(root, 'prog-def-colour', String(d.colour || TEMPLATE_DEFAULTS.colour));
+        setVal(root, 'prog-def-speed', d.rotation_speed);
+        setVal(root, 'prog-def-width', d.px_width);
+        setVal(root, 'prog-def-height', d.px_height);
+    }
+
+    function numOr(v, fallback) {
+        var n = typeof v === 'number' ? v : parseFloat(v);
+        return isNaN(n) ? fallback : n;
+    }
+
+    function onDefaultsInput(root, event) {
+        var t = event.target;
+        if (!t || !t.id || t.id.indexOf('prog-def-') !== 0 || !root.contains(t)) return;
+        var d = ensureDefaults();
+        if (!d) return;
+        if (t.id === 'prog-def-colour') {
+            if (/^#[0-9a-fA-F]{6}$/.test(t.value)) d.colour = t.value;
+        } else if (t.id === 'prog-def-speed') {
+            d.rotation_speed = Math.max(0.3, numOr(t.value, TEMPLATE_DEFAULTS.rotation_speed));
+        } else if (t.id === 'prog-def-width') {
+            d.px_width = Math.max(1, Math.round(numOr(t.value, TEMPLATE_DEFAULTS.px_width)));
+        } else if (t.id === 'prog-def-height') {
+            d.px_height = Math.max(1, Math.round(numOr(t.value, TEMPLATE_DEFAULTS.px_height)));
+        }
+        persist(root);
+    }
+
     // Copy/move clipboard: { mode: 'copy'|'move', snapshot, label, from: { program, service, destination, page } }.
     var clipboard = null;
 
@@ -257,6 +314,7 @@
                 S.data = JSON.parse(raw);
                 S.dirty = true;
                 render(root);
+                fillDefaults(root);
                 setStatus(root, 'Unsaved changes');
                 return Promise.resolve();
             } catch (err) { /* fall through to fetch */ }
@@ -271,6 +329,7 @@
                 S.data = data;
                 S.dirty = false;
                 render(root);
+                fillDefaults(root);
                 setStatus(root, '');
             })
             .catch(function (err) {
@@ -622,7 +681,9 @@
             S.dirty = false;
             storeSet(SEL_KEY, S.name);
             loadProgram(root);
+            return;
         }
+        onDefaultsInput(root, event);
     }
 
     var boundRoot = null;
@@ -652,6 +713,8 @@
         boundRoot = root;
         root.addEventListener('click', function (event) { onClick(root, event); });
         root.addEventListener('change', function (event) { onChange(root, event); });
+        // Colour picker drags only fire `input`, so listen for that too.
+        root.addEventListener('input', function (event) { onDefaultsInput(root, event); });
     }
 
     window.NSLProgram = { init: init };
