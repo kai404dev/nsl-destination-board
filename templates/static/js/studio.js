@@ -9,9 +9,19 @@
         fonts: '/templates/pages/fonts.html',
         settings: '/templates/pages/settings.html'
     };
+    var VIEW_KEY = 'nsl.studioView.v1';
 
     var tabsEl = document.getElementById('studio-tabs');
     var contentEl = document.getElementById('contenter');
+
+    function savedView() {
+        try {
+            var v = localStorage.getItem(VIEW_KEY);
+            return VIEWS[v] ? v : 'editor';
+        } catch (err) {
+            return 'editor';
+        }
+    }
 
     function setActive(name) {
         tabsEl.querySelectorAll('.tab button').forEach(function (btn) {
@@ -21,6 +31,9 @@
 
     function load(name) {
         if (!VIEWS[name]) return;
+        try {
+            localStorage.setItem(VIEW_KEY, name);
+        } catch (err) { /* ignore */ }
         setActive(name);
         contentEl.innerHTML = '<p>Loading...</p>';
         fetch(VIEWS[name])
@@ -50,6 +63,6 @@
     });
 
     window.addEventListener('DOMContentLoaded', function () {
-        load('editor');
+        load(savedView());
     });
 })();

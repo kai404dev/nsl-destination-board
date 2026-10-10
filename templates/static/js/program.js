@@ -198,6 +198,44 @@
     // Copy/move clipboard: { mode: 'copy'|'move', snapshot, label, from: { program, service, destination, page } }.
     var clipboard = null;
 
+    // Collapsed-destination view state: which destination page lists are
+    // expanded. Keyed by program so switching files never leaks, and
+    // persisted so a refresh restores the same view.
+    var EXP_KEY = 'nsl.programExpanded.v1';
+    var expanded = {};
+    try {
+        var _savedExp = JSON.parse(storeGet(EXP_KEY));
+        if (_savedExp && typeof _savedExp === 'object') expanded = _savedExp;
+    } catch (err) { /* ignore */ }
+
+    function saveExpanded() {
+        try {
+            if (Object.keys(expanded).length > 1000) expanded = {};
+            storeSet(EXP_KEY, JSON.stringify(expanded));
+        } catch (err) { /* ignore */ }
+    }
+
+    function expKey(service, destinationName) {
+        return S.name + '\0' + service + '\0' + destinationName;
+    }
+
+    function setExpanded(service, destinationName, on) {
+        var k = expKey(service, destinationName);
+        if (on) expanded[k] = true;
+        else delete expanded[k];
+        saveExpanded();
+    }
+
+    function dropExpanded(service, destinationName) {
+        var prefix = S.name + '\0' + service + '\0';
+        Object.keys(expanded).forEach(function (k) {
+            if (k === prefix + destinationName || (destinationName === undefined && k.indexOf(prefix) === 0)) {
+                delete expanded[k];
+            }
+        });
+        saveExpanded();
+    }
+
     function storeGet(key) {
         try {
             return localStorage.getItem(key);
@@ -276,14 +314,30 @@
             return;
         }
         var services = S.data.services || {};
+        var destTotal = 0;
+        sortedKeys(services).forEach(function (service) {
+            destTotal += Object.keys(services[service] || {}).length;
+        });
         var html = '';
+        if (destTotal) {
+            html += '<div class="prog-list-bar"><span class="muted">' + destTotal +
+                ' destination' + (destTotal === 1 ? '' : 's') + '</span>' +
+                '<button type="button" data-action="expand-all">Expand all</button>' +
+                '<button type="button" data-action="collapse-all">Collapse all</button></div>';
+        }
         sortedKeys(services).forEach(function (service) {
             html += '<div class="service-group-head"><h3 class="service-key">Service ' + esc(service) + '</h3>' +
                 '<button type="button" class="danger-ghost" data-action="delete-service" data-service="' + esc(service) +
                 '" aria-label="Delete service ' + esc(service) + '">Delete service</button></div>';
             sortedDestinations(services, service).forEach(function (name) {
                 var destination = services[service][name] || {};
-                html += '<div class="service"><div class="service-head"><strong>' + esc(name) + '</strong>' +
+                var isExp = !!expanded[expKey(service, name)];
+                html += '<div class="service"><div class="service-head">' +
+                    '<button type="button" class="dest-toggle" data-action="toggle-destination" data-service="' + esc(service) +
+                    '" data-destination="' + esc(name) + '" aria-expanded="' + (isExp ? 'true' : 'false') +
+                    '" aria-label="' + (isExp ? 'Collapse ' : 'Expand ') + esc(name) + '">' +
+                    (isExp ? '▾' : '▸') + '</button>' +
+                    '<strong>' + esc(name) + '</strong>' +
                     '<input type="text" class="code-edit" data-service="' + esc(service) +
                     '" data-destination="' + esc(name) + '" value="' + esc(destination.service_code || '') +
                     '" maxlength="12" spellcheck="false" aria-label="Service code for ' + esc(name) + '">';
@@ -296,7 +350,7 @@
                     html += '<button type="button" class="paste-btn" data-action="paste-page" data-service="' + esc(service) +
                         '" data-destination="' + esc(name) + '">Paste here</button>';
                 }
-                html += '</div><div class="page-list">';
+                html += '</div><div class="page-list"' + (isExp ? '' : ' hidden') + '>';
                 var pages = servicePages(destination);
                 if (pages) {
                     sortedKeys(pages).forEach(function (pageKey, idx, arr) {
@@ -691,6 +745,7 @@
         var mode = clipboard.mode;
         var from = clipboard.from;
         clipboard = null;
+        setExpanded(service, destinationName, true);
         persist(root);
         render(root);
         if (mode === 'move' && from.program !== S.name) {
@@ -742,6 +797,7 @@
         if (Object.keys(group).length === 0) {
             delete S.data.services[service];
         }
+        dropExpanded(service, destinationName);
         persist(root);
         render(root);
     }
@@ -752,6 +808,7 @@
         var n = Object.keys(group).length;
         if (!window.confirm('Delete service ' + service + ' with ' + n + ' destination' + (n === 1 ? '' : 's') + '?')) return;
         delete S.data.services[service];
+        dropExpanded(service);
         persist(root);
         render(root);
     }
@@ -793,6 +850,7 @@
         };
         if (nameEl) nameEl.value = '';
         if (codeEl) codeEl.value = '';
+        setExpanded(service, name, true);
         persist(root);
         render(root);
         // Save straight through so the .dest file matches: the Editor tab
@@ -866,6 +924,27 @@
         else if (action === 'delete-page') deletePage(root, btn.dataset.service, btn.dataset.destination, btn.dataset.page);
         else if (action === 'delete-destination') deleteDestination(root, btn.dataset.service, btn.dataset.destination);
         else if (action === 'delete-service') deleteService(root, btn.dataset.service);
+        else if (action === 'toggle-destination') {
+            setExpanded(btn.dataset.service, btn.dataset.destination,
+                !expanded[expKey(btn.dataset.service, btn.dataset.destination)]);
+            render(root);
+        }
+        else if (action === 'expand-all') {
+            Object.keys(S.data && S.data.services || {}).forEach(function (service) {
+                Object.keys(S.data.services[service] || {}).forEach(function (name) {
+                    setExpanded(service, name, true);
+                });
+            });
+            render(root);
+        }
+        else if (action === 'collapse-all') {
+            Object.keys(S.data && S.data.services || {}).forEach(function (service) {
+                Object.keys(S.data.services[service] || {}).forEach(function (name) {
+                    setExpanded(service, name, false);
+                });
+            });
+            render(root);
+        }
         else if (action === 'shift-left') shiftPage(root, btn.dataset.service, btn.dataset.destination, btn.dataset.page, -1);
         else if (action === 'shift-right') shiftPage(root, btn.dataset.service, btn.dataset.destination, btn.dataset.page, 1);
         else if (action === 'delete-program') deleteProgram(root);
