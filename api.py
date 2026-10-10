@@ -901,6 +901,111 @@ def save_selection(root: Path, program: str, service: str,
 
 
 # ---------------------------------------------------------------------------
+# Board config: boot/startup behaviour, shared by the portal and the board
+# loop. Stored as JSON next to the programs (board_config.json).
+#
+#     {"startup_mode": "resume|default|blank",
+#      "startup_program": ..., "startup_service": ...,
+#      "startup_destination": ..., "boot_screen": true,
+#      "boot_bitmap": "bitmaps/shared/custom.png" | ""}
+#
+# startup_mode resume keeps the last board selection across reboots,
+# default plays one configured destination, blank boots clear (as before).
+# boot_screen shows the splash first; boot_bitmap replaces the built-in
+# splash pages with one fullscreen bitmap (scaled to fit).
+# ---------------------------------------------------------------------------
+
+CONFIG_FILE = "board_config.json"
+
+STARTUP_MODES = ("resume", "default", "blank")
+
+DEFAULT_CONFIG = {
+    "startup_mode": "blank",
+    "startup_program": "",
+    "startup_service": "",
+    "startup_destination": "",
+    "boot_screen": True,
+    "boot_bitmap": "",
+}
+
+
+def load_config(root: Path) -> dict:
+    """Read board_config.json, merged over the defaults."""
+    from pathlib import Path as _P
+
+    cfg = dict(DEFAULT_CONFIG)
+    try:
+        raw = json.loads((_P(root) / CONFIG_FILE).read_text(encoding="utf-8"))
+    except (OSError, ValueError, AttributeError):
+        return cfg
+    if not isinstance(raw, dict):
+        return cfg
+    if raw.get("startup_mode") in STARTUP_MODES:
+        cfg["startup_mode"] = raw["startup_mode"]
+    for key in ("startup_program", "startup_service", "startup_destination",
+                "boot_bitmap"):
+        if isinstance(raw.get(key), str):
+            cfg[key] = raw[key]
+    if isinstance(raw.get("boot_screen"), bool):
+        cfg["boot_screen"] = raw["boot_screen"]
+    return cfg
+
+
+def save_config(root: Path, data: dict) -> tuple[bool, str]:
+    """Validate and persist a new board config. Returns (ok, message)."""
+    from pathlib import Path as _P
+
+    if not isinstance(data, dict):
+        return False, "body must be JSON"
+    root = _P(root)
+    cfg = load_config(root)
+    if "startup_mode" in data:
+        if data["startup_mode"] not in STARTUP_MODES:
+            return False, "startup_mode must be resume, default or blank"
+        cfg["startup_mode"] = data["startup_mode"]
+    for key in ("startup_program", "startup_service", "startup_destination"):
+        if key in data:
+            if not isinstance(data[key], str):
+                return False, f"{key} must be a string"
+            cfg[key] = data[key]
+    if "boot_screen" in data:
+        cfg["boot_screen"] = bool(data["boot_screen"])
+    if "boot_bitmap" in data:
+        rel = data["boot_bitmap"]
+        if not isinstance(rel, str):
+            return False, "boot_bitmap must be a string"
+        rel = rel.strip()
+        if rel:
+            path = _resolve_bitmap_rel(root, rel)
+            if path is None or not path.is_file():
+                return False, "boot image not found under bitmaps/"
+            if path.suffix.lower() not in BITMAP_ALLOWED_EXTS:
+                return False, "boot image must be a PNG/JPG/BMP/GIF file"
+            try:
+                rel = path.resolve().relative_to(root.resolve()).as_posix()
+            except (OSError, ValueError):
+                return False, "boot image not found under bitmaps/"
+        cfg["boot_bitmap"] = rel
+    if cfg["startup_mode"] == "default":
+        programs_dir = root / "programs"
+        prog = load_program(programs_dir, cfg["startup_program"] or "")
+        if prog is None:
+            return False, "startup program not found"
+        if cfg["startup_service"] not in list_services(prog):
+            return False, "startup service not found"
+        if cfg["startup_destination"] not in list_destinations(
+                prog, cfg["startup_service"]):
+            return False, "startup destination not found"
+    try:
+        tmp = root / (CONFIG_FILE + ".tmp")
+        tmp.write_text(json.dumps(cfg, indent=2) + "\n", encoding="utf-8")
+        tmp.replace(root / CONFIG_FILE)
+    except OSError as exc:
+        return False, f"cannot write config: {exc}"
+    return True, "saved"
+
+
+# ---------------------------------------------------------------------------
 # Bitmaps: uploadable PNG/JPG images positioned on text pages.
 #
 # Files live under ``bitmaps/shared/`` (uploads go here) plus any existing

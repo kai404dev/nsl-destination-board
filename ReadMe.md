@@ -132,11 +132,14 @@ line confirms it (`scrolling text on N pages`), as does
 
 Open `/controller`, pick Program → Service → Destination, then
 **Show on board**. The choice is saved to `board_state.json` and plays
-until the app restarts — every boot plays the built-in startup splash
-(10s) first, then starts blank, so pick again after a
-reboot. Switching destinations blanks the screen for 3s before showing
-the new one. Until anything is picked (fresh boot included, after the
-splash) the panels stay blank. API:
+until the app restarts. What happens on reboot is set in Studio →
+Settings → Board startup (stored on the board, in `board_config.json`):
+resume where it left off, start on a default destination, or start
+blank. A boot screen (built-in splash, or a custom uploaded bitmap)
+can play first — picking a destination during it cuts straight through.
+Switching destinations blanks the screen for 3s before showing
+the new one. Until anything is picked (fresh boot included, after any
+boot screen) the panels stay blank. API:
 
 * `GET /api/board/state` — current selection + page count + speed
 * `POST /api/board/select {"program","service","destination"}`

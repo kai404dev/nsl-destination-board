@@ -22,6 +22,7 @@ Routes:
     /api/bitmaps/<bitmaps/...>        -> DELETE one bitmap
     /bitmaps/<path>                   -> raw bitmap files (page overlays)
     /api/board/state                  -> GET current board selection + info
+    /api/board/config                 -> GET/PUT board startup config
     /api/board/select                 -> POST {program,service,destination}
     /api/board/preview                -> POST {page,width,height,seconds}
                                        (live editor preview), DELETE to stop
@@ -222,6 +223,8 @@ class BoardHandler(SimpleHTTPRequestHandler):
             return self._serve_json(api.list_bitmaps(ROOT))
         if url_path in ("/api/board/state", "/api/board/state/"):
             return self._serve_json(_board_state_payload())
+        if url_path in ("/api/board/config", "/api/board/config/"):
+            return self._serve_json(api.load_config(ROOT))
         if url_path.startswith("/api/programs/"):
             name = urllib.parse.unquote(url_path[len("/api/programs/"):].strip("/"))
             program = api.load_program(PROGRAMS_DIR, name)
@@ -246,6 +249,16 @@ class BoardHandler(SimpleHTTPRequestHandler):
             if not ok:
                 status = 404 if message == "program not found" else 400
                 return self._serve_json({"error": message}, status=status)
+            return self._serve_json({"ok": True})
+
+        # Save the board startup config.
+        if url_path in ("/api/board/config", "/api/board/config/"):
+            data, error = self._read_json_body()
+            if error:
+                return self._serve_json({"error": error}, status=400)
+            ok, message = api.save_config(ROOT, data)
+            if not ok:
+                return self._serve_json({"error": message}, status=400)
             return self._serve_json({"ok": True})
 
         # Save one glyph's pixels: PUT {rows: [[0|1]]}.

@@ -676,6 +676,8 @@ def _play_scrolling(matrix, page: dict, W: int, H: int,
 
 SPLASH_PAGE_SECONDS = 10.0  # dwell per boot splash page (1 page = 10s)
 
+BOOT_BITMAP_SECONDS = 10.0  # dwell for a custom boot bitmap
+
 
 def splash_pages() -> list[dict]:
     """Built-in startup page (moved out of defualt.dest's startup/start).
@@ -726,6 +728,30 @@ def _play_splash(matrix, phys_w: int, phys_h: int,
     return False
 
 
+def _play_splash_bitmap(matrix, phys_w: int, phys_h: int,
+                       rel: str, sel: dict) -> bool:
+    """Show one custom boot bitmap for BOOT_BITMAP_SECONDS.
+
+    Returns True when a new selection or preview cut in. A missing file
+    falls back to a blank boot (False, nothing shown).
+    """
+    from PIL import Image
+
+    path = _resolve_page_image(rel)
+    if path is None:
+        print(f"Board: custom boot image missing ({rel}) - skipping splash")
+        return False
+    try:
+        img = render_bitmap(path, 240, 40)
+    except Exception as exc:
+        print(f"Board: cannot load boot image {rel}: {exc}")
+        return False
+    if img.size != (phys_w, phys_h):
+        img = img.resize((phys_w, phys_h), Image.NEAREST)
+    matrix.SetImage(img.convert("RGB"))
+    return _wait_while_selected(BOOT_BITMAP_SECONDS, sel)
+
+
 def run_board(args) -> None:
     """Main player loop: render frames, push to matrix, follow state file."""
     import api
@@ -740,13 +766,24 @@ def run_board(args) -> None:
           f"(rows={args.led_rows} cols={args.led_cols} chain={args.led_chain})")
     matrix.Clear()  # blank screen until the Controller picks a destination
     last_key = None
-    # Boot splash first: 5s per page, then the normal selection loop
-    # (which boots blank until the Controller picks - see main.py).
-    # Picking a destination (or previewing) during the splash cuts in.
+    # Boot splash first (unless disabled in the board config): the custom
+    # bitmap when one is set, else the built-in pages. Picking a
+    # destination (or previewing) during the splash cuts in. Afterwards
+    # the normal selection loop takes over (see main.py for what boot
+    # selection that is: resumed, default, or blank).
     sel = _read_selection()
-    _pages = splash_pages()
-    print(f"Board: startup splash ({len(_pages)} pages x {SPLASH_PAGE_SECONDS:g}s)")
-    _play_splash(matrix, phys_w, phys_h, _pages, sel)
+    _cfg = api.load_config(ROOT)
+    if _cfg.get("boot_screen", True):
+        _bmp = (_cfg.get("boot_bitmap") or "").strip()
+        if _bmp:
+            print(f"Board: custom boot screen ({_bmp}, {BOOT_BITMAP_SECONDS:g}s)")
+            _play_splash_bitmap(matrix, phys_w, phys_h, _bmp, sel)
+        else:
+            _pages = splash_pages()
+            print(f"Board: startup splash ({len(_pages)} pages x {SPLASH_PAGE_SECONDS:g}s)")
+            _play_splash(matrix, phys_w, phys_h, _pages, sel)
+    else:
+        print("Board: boot screen disabled - straight to selection")
     blank_notice_key = None  # last key we already logged a blank notice for
     previewing = False
     frames: list = []

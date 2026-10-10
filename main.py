@@ -52,13 +52,31 @@ def main(argv=None) -> None:
     if not run_portal and not run_board:
         run_portal = run_board = True  # bare `python main.py` runs both
 
-    # Every boot starts blank: forget any previously picked destination so
-    # the panels stay clear until the Controller picks one.
+    # Boot selection comes from the board config: resume keeps the last
+    # picked destination, default starts one configured destination,
+    # blank (as before) clears it so the panels stay clear.
     import api
     from pathlib import Path as _P
 
-    api.clear_selection(_P(__file__).resolve().parent)
-    print("Board selection cleared - booting to a blank screen")
+    _ROOT = _P(__file__).resolve().parent
+    _cfg = api.load_config(_ROOT)
+    _mode = _cfg.get("startup_mode", "blank")
+    if _mode == "resume":
+        print("Board selection kept - resuming where it left off")
+    elif _mode == "default":
+        _ok, _msg = api.save_selection(
+            _ROOT, str(_cfg.get("startup_program") or ""),
+            str(_cfg.get("startup_service") or ""),
+            str(_cfg.get("startup_destination") or ""))
+        if _ok:
+            print(f"Board starting on default {_cfg.get('startup_program')} / "
+                  f"{_cfg.get('startup_service')} / {_cfg.get('startup_destination')}")
+        else:
+            api.clear_selection(_ROOT)
+            print(f"Default startup invalid ({_msg}) - booting to a blank screen")
+    else:
+        api.clear_selection(_ROOT)
+        print("Board selection cleared - booting to a blank screen")
 
     threads: list[threading.Thread] = []
     if run_portal:

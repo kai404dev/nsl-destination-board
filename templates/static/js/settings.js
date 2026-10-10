@@ -221,11 +221,237 @@
 
     var boundRoot = null;
 
+    // ---- Board startup (stored on the board, not in this browser) ----
+    // A: resume where it left off, B: a default destination, C: blank,
+    // D: boot screen on/off, E: custom boot bitmap (or built-in splash).
+
+    var bootCache = {}; // program name -> program JSON
+
+    function bootSay(root, text) {
+        var el = $(root, 'boot-status');
+        if (el) el.textContent = text;
+    }
+
+    function bootMode(root) {
+        var checked = root.querySelector('input[name="boot-mode"]:checked');
+        return checked ? checked.value : 'blank';
+    }
+
+    function syncBootModeUI(root) {
+        var on = bootMode(root) === 'default';
+        ['boot-program', 'boot-service', 'boot-destination'].forEach(function (id) {
+            var el = $(root, id);
+            if (el) el.disabled = !on;
+        });
+    }
+
+    function svcSorted(keys) {
+        return keys.slice().sort(function (a, b) {
+            var na = /^\d+$/.test(a), nb = /^\d+$/.test(b);
+            if (na && nb) return parseInt(a, 10) - parseInt(b, 10);
+            if (na) return -1;
+            if (nb) return 1;
+            return String(a).localeCompare(String(b), undefined, { numeric: true });
+        });
+    }
+
+    function destSorted(program, service) {
+        var group = ((program.services || {})[service]) || {};
+        function code(n) { return (((group[n] || {}).service_code) || '').trim(); }
+        return Object.keys(group).sort(function (a, b) {
+            var ca = code(a), cb = code(b);
+            var na = /^\d+$/.test(ca), nb = /^\d+$/.test(cb);
+            if (na && nb) {
+                var diff = parseInt(ca, 10) - parseInt(cb, 10);
+                if (diff) return diff;
+            } else if (na) {
+                return -1;
+            } else if (nb) {
+                return 1;
+            } else if (ca !== cb) {
+                return ca.localeCompare(cb);
+            }
+            return String(a).localeCompare(String(b), undefined, { numeric: true });
+        });
+    }
+
+    function fillBootSelect(root, id, items, current) {
+        var el = $(root, id);
+        if (!el) return;
+        el.innerHTML = '';
+        items.forEach(function (name) {
+            var opt = document.createElement('option');
+            opt.value = name;
+            opt.textContent = name;
+            el.appendChild(opt);
+        });
+        if (!items.length) {
+            var opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = '—';
+            el.appendChild(opt);
+            return;
+        }
+        var idx = items.indexOf(current);
+        el.value = idx >= 0 ? items[idx] : items[0];
+    }
+
+    function bootProgram(name) {
+        if (bootCache[name]) return Promise.resolve(bootCache[name]);
+        return fetch('/api/programs/' + encodeURIComponent(name))
+            .then(function (r) {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.json();
+            })
+            .then(function (p) { bootCache[name] = p; return p; });
+    }
+
+    function loadBootDestinations(root, program, service, keep) {
+        var names = program ? destSorted(program, service) : [];
+        fillBootSelect(root, 'boot-destination', names, keep);
+    }
+
+    function loadBootServices(root, programName, keepService, keepDest) {
+        if (!programName) {
+            fillBootSelect(root, 'boot-service', [], '');
+            fillBootSelect(root, 'boot-destination', [], '');
+            return Promise.resolve();
+        }
+        return bootProgram(programName).then(function (program) {
+            var services = svcSorted(Object.keys((program.services || {})));
+            var svcEl = $(root, 'boot-service');
+            fillBootSelect(root, 'boot-service', services, keepService);
+            loadBootDestinations(root, program, svcEl ? svcEl.value : '', keepDest);
+        }).catch(function (err) {
+            console.error(err);
+            fillBootSelect(root, 'boot-service', [], '');
+            fillBootSelect(root, 'boot-destination', [], '');
+        });
+    }
+
+    function loadBootBitmaps(root, keep) {
+        return fetch('/api/bitmaps')
+            .then(function (r) {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.json();
+            })
+            .then(function (files) {
+                var el = $(root, 'boot-bitmap');
+                if (!el) return;
+                el.innerHTML = '';
+                var base = document.createElement('option');
+                base.value = '';
+                base.textContent = 'Built-in splash';
+                el.appendChild(base);
+                (files || []).forEach(function (f) {
+                    var path = (f && f.path) || f;
+                    if (!path) return;
+                    var opt = document.createElement('option');
+                    opt.value = path;
+                    opt.textContent = String(path).split('/').pop();
+                    el.appendChild(opt);
+                });
+                el.value = keep || '';
+            })
+            .catch(function (err) {
+                console.error(err);
+            });
+    }
+
+    function loadBootConfig(root) {
+        bootSay(root, 'Loading…');
+        fetch('/api/board/config')
+            .then(function (r) {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.json();
+            })
+            .then(function (cfg) {
+                var radio = root.querySelector('input[name="boot-mode"][value="' + (cfg.startup_mode || 'blank') + '"]');
+                if (radio) radio.checked = true;
+                var screen = $(root, 'boot-screen');
+                if (screen) screen.checked = cfg.boot_screen !== false;
+                syncBootModeUI(root);
+                return fetch('/api/programs')
+                    .then(function (r) {
+                        if (!r.ok) throw new Error('HTTP ' + r.status);
+                        return r.json();
+                    })
+                    .then(function (names) {
+                        fillBootSelect(root, 'boot-program', names, cfg.startup_program);
+                        var progEl = $(root, 'boot-program');
+                        var p = loadBootServices(root, progEl ? progEl.value : '',
+                            cfg.startup_service, cfg.startup_destination);
+                        loadBootBitmaps(root, cfg.boot_bitmap);
+                        return p;
+                    });
+            })
+            .then(function () { bootSay(root, ''); })
+            .catch(function (err) {
+                console.error(err);
+                bootSay(root, 'Could not load board settings');
+            });
+    }
+
+    function bootSave(root) {
+        var body = {
+            startup_mode: bootMode(root),
+            startup_program: ($(root, 'boot-program') || {}).value || '',
+            startup_service: ($(root, 'boot-service') || {}).value || '',
+            startup_destination: ($(root, 'boot-destination') || {}).value || '',
+            boot_screen: !!($(root, 'boot-screen') && $(root, 'boot-screen').checked),
+            boot_bitmap: ($(root, 'boot-bitmap') || {}).value || ''
+        };
+        bootSay(root, 'Saving…');
+        fetch('/api/board/config', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        })
+            .then(function (r) {
+                return r.json().then(function (j) { return { ok: r.ok, body: j }; });
+            })
+            .then(function (res) {
+                if (!res.ok) throw new Error((res.body && res.body.error) || 'failed');
+                bootSay(root, 'Saved — applies on next reboot');
+            })
+            .catch(function (err) {
+                console.error(err);
+                bootSay(root, 'Save failed: ' + err.message);
+            });
+    }
+
+    function bootChange(root, event) {
+        var t = event.target;
+        if (!t || !root.contains(t)) return;
+        if (t.name === 'boot-mode') {
+            syncBootModeUI(root);
+            return;
+        }
+        if (t.id === 'boot-program') {
+            loadBootServices(root, t.value, '', '');
+            return;
+        }
+        if (t.id === 'boot-service') {
+            var progEl = $(root, 'boot-program');
+            bootProgram(progEl ? progEl.value : '').then(function (program) {
+                loadBootDestinations(root, program, t.value, '');
+            }).catch(function (err) {
+                console.error(err);
+            });
+        }
+    }
+
+    function bootClick(root, event) {
+        var btn = event.target.closest ? event.target.closest('#boot-save') : null;
+        if (btn && root.contains(btn)) bootSave(root);
+    }
+
     function refresh(root) {
         var s = get();
         applyState(root, s);
         loadFonts(root);
         setStatus(root, '');
+        loadBootConfig(root);
     }
 
     function init(root) {
@@ -233,6 +459,8 @@
         refresh(root);
         if (boundRoot === root) return;
         boundRoot = root;
+        root.addEventListener('change', function (event) { bootChange(root, event); });
+        root.addEventListener('click', function (event) { bootClick(root, event); });
         var timer = null;
         root.addEventListener('input', function (event) {
             var t = event.target;

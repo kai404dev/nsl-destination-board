@@ -47,5 +47,25 @@
                 <span class="prog-status" id="set-status"></span>
             </div>
         </div>
+        <div class="prog-defaults">
+            <h3>Board startup</h3>
+            <p class="muted">Stored on the board itself. Applies on the next reboot.</p>
+            <label class="check-row"><input type="radio" name="boot-mode" value="resume"> Resume where it left off</label>
+            <label class="check-row"><input type="radio" name="boot-mode" value="default"> Start on a default destination</label>
+            <label class="check-row"><input type="radio" name="boot-mode" value="blank"> Start blank</label>
+            <div class="add-grid">
+                <label>Program<select id="boot-program"><option>Loading…</option></select></label>
+                <label>Service<select id="boot-service"><option>Select a program first</option></select></label>
+                <label>Destination<select id="boot-destination"><option>Select a service first</option></select></label>
+            </div>
+            <label class="check-row"><input type="checkbox" id="boot-screen"> Show boot screen first</label>
+            <label for="boot-bitmap">Custom boot image</label>
+            <select id="boot-bitmap"><option value="">Built-in splash</option></select>
+            <p class="muted">Upload images in Editor → Bitmaps; anything works, scaled to fit.</p>
+            <div class="set-bar">
+                <button id="boot-save" class="btn-primary" type="button">Save startup</button>
+                <span class="prog-status" id="boot-status"></span>
+            </div>
+        </div>
     </div>
 </div>
