@@ -74,6 +74,51 @@ this browser) sets the display size driving the Editor canvas, plus
 your default colour, layout and per-element fonts/sizes for fresh
 drafts and new pages.
 
+### Program file format (v2)
+
+`.dest` files are JSON with `defaults` + `services`. Files without
+`defaults.version` are v1 (every field spelled out); `"version": 2`
+marks the compact v2 shape, which packs each text element's geometry,
+alignment and spacing into arrays and drops anything repeating the
+defaults:
+
+```json
+"number": {
+  "text": "1", "font": "johnston100-45",
+  "area": [180, 0, 240, 40],
+  "alignment": ["center", "middle"],
+  "spacing": [null, 0, 1, null]
+}
+```
+
+* `area` = `[x1, y1, x2, y2]` (was `from_X`/`front_Y`/`to_X`/`to_Y`)
+* `alignment` = `[align, valign]`, default `["center", "middle"]`
+* `spacing` = `[line_height (null = auto), line_gap, letter_spacing,
+  space_width (null)]`, default `[null, 0, 0, null]` — arrays may be
+  shortened from the right while dropped slots equal the defaults, and
+  the key is omitted when all default (so `"spacing": [16]` means
+  `line_height` 16, everything else default)
+* `colour` is omitted when it equals `defaults.colour`,
+  `service_name` when it equals the destination key, empty
+  `service_code`s, and image `x`/`y` when 0
+* `"scroll": true` on a destination/via element (kept as-is in both
+  versions): over-wide text scrolls left like a blind instead of being
+  clipped. It only engages when the text overflows its box — fitting
+  text renders statically as before. Multi-line scrolling text is
+  joined into one line with spaces. Tick **Scroll if too wide** in the
+  Editor's Destination/Via panels; the canvas preview plays the marquee
+  live and the Program tab badges scrolling destinations.
+
+The portal API always serves expanded v1 and compacts back to v2 on
+every save, so the board, Studio and hand-written v1 files keep working
+— just open and Save a v1 program to convert it.
+
+Scrolling pages play inside their normal rotation slot: the board holds
+the start position ~0.8s, slides the text left, holds the end ~0.8s,
+then moves to the next page (shorter slots scroll faster to fit).
+Switching destinations or starting an editor preview cuts in
+immediately, like any other page change.
+
 ### Choosing what plays (Controller tab)
 
 Open `/controller`, pick Program → Service → Destination, then

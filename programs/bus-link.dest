@@ -3,70 +3,46 @@
     "colour": "#DB7700",
     "rotation_speed": 3,
     "px_width": 240,
-    "px_height": 40
+    "px_height": 40,
+    "version": 2
   },
   "services": {
     "0": {
       "Not in Service": {
         "service_code": "000",
-        "service_name": "Not in Service",
         "text": {
           "0:": {
             "number": {
               "text": "",
               "font": "johnston100-45",
-              "colour": "#DB7700",
-              "from_X": 210,
-              "to_X": 240,
-              "front_Y": 0,
-              "to_Y": 40
+              "area": [210, 0, 240, 40]
             },
             "destination": {
               "text": "Bus Link",
               "font": "johnston100-33",
-              "colour": "#DB7700",
-              "from_X": 0,
-              "to_X": 240,
-              "front_Y": 0,
-              "to_Y": 26
+              "area": [0, 0, 240, 26]
             },
             "via": {
               "text": "Not in Service",
               "font": "johnston100-20",
-              "colour": "#DB7700",
-              "from_X": 0,
-              "to_X": 240,
-              "front_Y": 26,
-              "to_Y": 40
+              "area": [0, 26, 240, 40]
             }
           },
           "1:": {
             "number": {
               "text": "",
               "font": "johnston100-45",
-              "colour": "#DB7700",
-              "from_X": 210,
-              "to_X": 240,
-              "front_Y": 0,
-              "to_Y": 40
+              "area": [210, 0, 240, 40]
             },
             "destination": {
               "text": "Not in Service",
               "font": "johnston100-33",
-              "colour": "#DB7700",
-              "from_X": 0,
-              "to_X": 240,
-              "front_Y": 0,
-              "to_Y": 23
+              "area": [0, 0, 240, 23]
             },
             "via": {
               "text": "Sorry",
               "font": "johnston100-20",
-              "colour": "#DB7700",
-              "from_X": 0,
-              "to_X": 240,
-              "front_Y": 23,
-              "to_Y": 40
+              "area": [0, 23, 240, 40]
             }
           }
         }
@@ -74,77 +50,39 @@
     },
     "31": {
       "Lichfield": {
-        "service_code": "",
-        "service_name": "Lichfield",
         "text": {
           "0:": {
             "number": {
               "text": "31",
               "font": "johnston100-45",
-              "colour": "#DB7700",
-              "from_X": 200,
-              "to_X": 240,
-              "front_Y": 0,
-              "to_Y": 40,
-              "align": "center",
-              "valign": "middle"
+              "area": [200, 0, 240, 40]
             },
             "destination": {
               "text": "Lichfield",
               "font": "johnston100-33",
-              "colour": "#DB7700",
-              "from_X": 0,
-              "to_X": 200,
-              "front_Y": 0,
-              "to_Y": 25,
-              "align": "center",
-              "valign": "middle"
+              "area": [0, 0, 200, 25]
             },
             "via": {
               "text": "City Circular",
               "font": "johnston100-18",
-              "colour": "#DB7700",
-              "from_X": 0,
-              "to_X": 200,
-              "front_Y": 25,
-              "to_Y": 40,
-              "align": "center",
-              "valign": "middle"
+              "area": [0, 25, 200, 40]
             }
           },
           "1:": {
             "number": {
               "text": "31",
               "font": "johnston100-45",
-              "colour": "#DB7700",
-              "from_X": 200,
-              "to_X": 240,
-              "front_Y": 0,
-              "to_Y": 40,
-              "align": "center",
-              "valign": "middle"
+              "area": [200, 0, 240, 40]
             },
             "destination": {
               "text": "",
               "font": "johnston100-33",
-              "colour": "#DB7700",
-              "from_X": 0,
-              "to_X": 200,
-              "front_Y": 0,
-              "to_Y": 25,
-              "align": "center",
-              "valign": "middle"
+              "area": [0, 0, 200, 25]
             },
             "via": {
               "text": "Trent Valley, Stowe\nMorrisons, Christ Church",
               "font": "johnston100-17",
-              "colour": "#DB7700",
-              "from_X": 0,
-              "to_X": 200,
-              "front_Y": 0,
-              "to_Y": 40,
-              "align": "center",
-              "valign": "middle"
+              "area": [0, 0, 200, 40]
             }
           }
         }
@@ -152,77 +90,39 @@
     },
     "32": {
       "Lichfield": {
-        "service_code": "",
-        "service_name": "Lichfield",
         "text": {
           "2:": {
             "number": {
               "text": "32",
               "font": "johnston100-45",
-              "colour": "#DB7700",
-              "from_X": 195,
-              "to_X": 240,
-              "front_Y": 0,
-              "to_Y": 40,
-              "align": "center",
-              "valign": "middle"
+              "area": [195, 0, 240, 40]
             },
             "destination": {
               "text": "Lichfield",
               "font": "johnston100-33",
-              "colour": "#DB7700",
-              "from_X": 0,
-              "to_X": 200,
-              "front_Y": 0,
-              "to_Y": 25,
-              "align": "center",
-              "valign": "middle"
+              "area": [0, 0, 200, 25]
             },
             "via": {
               "text": "City Circular",
               "font": "johnston100-18",
-              "colour": "#DB7700",
-              "from_X": 0,
-              "to_X": 200,
-              "front_Y": 25,
-              "to_Y": 40,
-              "align": "center",
-              "valign": "middle"
+              "area": [0, 25, 200, 40]
             }
           },
           "4:": {
             "number": {
               "text": "32",
               "font": "johnston100-45",
-              "colour": "#DB7700",
-              "from_X": 195,
-              "to_X": 240,
-              "front_Y": 0,
-              "to_Y": 40,
-              "align": "center",
-              "valign": "middle"
+              "area": [195, 0, 240, 40]
             },
             "destination": {
               "text": "",
               "font": "johnston100-33",
-              "colour": "#DB7700",
-              "from_X": 0,
-              "to_X": 200,
-              "front_Y": 0,
-              "to_Y": 25,
-              "align": "center",
-              "valign": "middle"
+              "area": [0, 0, 200, 25]
             },
             "via": {
               "text": "Trent Valley\nMorrisons, Stowe",
               "font": "johnston100-21",
-              "colour": "#DB7700",
-              "from_X": 0,
-              "to_X": 200,
-              "front_Y": 0,
-              "to_Y": 40,
-              "align": "center",
-              "valign": "middle"
+              "area": [0, 0, 200, 40]
             }
           }
         }
@@ -230,153 +130,81 @@
     },
     "10s": {
       "Acorn Inn": {
-        "service_code": "",
-        "service_name": "Acorn Inn",
         "text": {
           "0:": {
             "number": {
               "text": "10s",
               "font": "johnston100-45",
-              "colour": "#DB7700",
-              "from_X": 185,
-              "to_X": 240,
-              "front_Y": 0,
-              "to_Y": 40,
-              "align": "center",
-              "valign": "middle"
+              "area": [185, 0, 240, 40]
             },
             "destination": {
               "text": "John Taylor",
               "font": "johnston100-33",
-              "colour": "#DB7700",
-              "from_X": 0,
-              "to_X": 185,
-              "front_Y": 0,
-              "to_Y": 30,
-              "align": "center",
-              "valign": "bottom"
+              "area": [0, 0, 185, 30],
+              "alignment": ["center", "bottom"]
             },
             "via": {
               "text": "Free School",
               "font": "johnston100-20",
-              "colour": "#DB7700",
-              "from_X": 0,
-              "to_X": 185,
-              "front_Y": 26,
-              "to_Y": 40,
-              "align": "center",
-              "valign": "middle"
+              "area": [0, 26, 185, 40]
             }
           },
           "1:": {
             "number": {
               "text": "10s",
               "font": "johnston100-45",
-              "colour": "#DB7700",
-              "from_X": 185,
-              "to_X": 240,
-              "front_Y": 0,
-              "to_Y": 40,
-              "align": "center",
-              "valign": "middle"
+              "area": [185, 0, 240, 40]
             },
             "destination": {
               "text": "School Service",
               "font": "johnston100-28",
-              "colour": "#DB7700",
-              "from_X": 0,
-              "to_X": 185,
-              "front_Y": 0,
-              "to_Y": 26,
-              "align": "center",
-              "valign": "middle"
+              "area": [0, 0, 185, 26]
             },
             "via": {
               "text": "Students only",
               "font": "johnston100-20",
-              "colour": "#DB7700",
-              "from_X": 0,
-              "to_X": 185,
-              "front_Y": 24,
-              "to_Y": 42,
-              "align": "center",
-              "valign": "bottom"
+              "area": [0, 24, 185, 42],
+              "alignment": ["center", "bottom"]
             }
           }
         }
       },
       "John Taylor Free School": {
-        "service_code": "",
-        "service_name": "John Taylor Free School",
         "text": {
           "1:": {
             "number": {
               "text": "10s",
               "font": "johnston100-45",
-              "colour": "#DB7700",
-              "from_X": 185,
-              "to_X": 240,
-              "front_Y": 0,
-              "to_Y": 40,
-              "align": "center",
-              "valign": "middle"
+              "area": [185, 0, 240, 40]
             },
             "destination": {
               "text": "Acorn Inn",
               "font": "johnston100-33",
-              "colour": "#DB7700",
-              "from_X": 0,
-              "to_X": 185,
-              "front_Y": 0,
-              "to_Y": 30,
-              "align": "center",
-              "valign": "bottom"
+              "area": [0, 0, 185, 30],
+              "alignment": ["center", "bottom"]
             },
             "via": {
               "text": "Shobnall",
               "font": "johnston100-20",
-              "colour": "#DB7700",
-              "from_X": 0,
-              "to_X": 185,
-              "front_Y": 26,
-              "to_Y": 40,
-              "align": "center",
-              "valign": "middle"
+              "area": [0, 26, 185, 40]
             }
           },
           "2:": {
             "number": {
               "text": "10s",
               "font": "johnston100-45",
-              "colour": "#DB7700",
-              "from_X": 185,
-              "to_X": 240,
-              "front_Y": 0,
-              "to_Y": 40,
-              "align": "center",
-              "valign": "middle"
+              "area": [185, 0, 240, 40]
             },
             "destination": {
               "text": "School Service",
               "font": "johnston100-28",
-              "colour": "#DB7700",
-              "from_X": 0,
-              "to_X": 185,
-              "front_Y": 0,
-              "to_Y": 26,
-              "align": "center",
-              "valign": "middle"
+              "area": [0, 0, 185, 26]
             },
             "via": {
               "text": "Students only",
               "font": "johnston100-20",
-              "colour": "#DB7700",
-              "from_X": 0,
-              "to_X": 185,
-              "front_Y": 24,
-              "to_Y": 42,
-              "align": "center",
-              "valign": "bottom"
+              "area": [0, 24, 185, 42],
+              "alignment": ["center", "bottom"]
             }
           }
         }
@@ -384,124 +212,64 @@
     },
     "12e": {
       "Burton": {
-        "service_code": "",
-        "service_name": "Burton",
         "text": {
           "0:": {
             "number": {
               "text": "12e",
               "font": "johnston100-45",
-              "colour": "#DB7700",
-              "from_X": 180,
-              "to_X": 240,
-              "front_Y": 0,
-              "to_Y": 40,
-              "align": "center",
-              "valign": "middle"
+              "area": [180, 0, 240, 40]
             },
             "destination": {
               "text": "Burton",
               "font": "johnston100-33",
-              "colour": "#DB7700",
-              "from_X": 0,
-              "to_X": 180,
-              "front_Y": 0,
-              "to_Y": 22,
-              "align": "center",
-              "valign": "middle"
+              "area": [0, 0, 180, 22]
             },
             "via": {
               "text": "Farley Barton",
               "font": "johnston100-20",
-              "colour": "#DB7700",
-              "from_X": 0,
-              "to_X": 180,
-              "front_Y": 20,
-              "to_Y": 40,
-              "align": "center",
-              "valign": "middle"
+              "area": [0, 20, 180, 40]
             }
           }
         }
       },
       "Lichfield": {
-        "service_code": "",
-        "service_name": "Lichfield",
         "text": {
           "1:": {
             "number": {
               "text": "12e",
               "font": "johnston100-45",
-              "colour": "#DB7700",
-              "from_X": 180,
-              "to_X": 240,
-              "front_Y": 0,
-              "to_Y": 40,
-              "align": "center",
-              "valign": "middle"
+              "area": [180, 0, 240, 40]
             },
             "destination": {
               "text": "Lichfiled",
               "font": "johnston100-33",
-              "colour": "#DB7700",
-              "from_X": 0,
-              "to_X": 180,
-              "front_Y": 0,
-              "to_Y": 22,
-              "align": "center",
-              "valign": "middle"
+              "area": [0, 0, 180, 22]
             },
             "via": {
               "text": "Farley Barton",
               "font": "johnston100-20",
-              "colour": "#DB7700",
-              "from_X": 0,
-              "to_X": 180,
-              "front_Y": 20,
-              "to_Y": 40,
-              "align": "center",
-              "valign": "middle"
+              "area": [0, 20, 180, 40]
             }
           }
         }
       },
       "Fradley": {
-        "service_code": "",
-        "service_name": "Fradley",
         "text": {
           "1:": {
             "number": {
               "text": "12e",
               "font": "johnston100-45",
-              "colour": "#DB7700",
-              "from_X": 180,
-              "to_X": 240,
-              "front_Y": 0,
-              "to_Y": 40,
-              "align": "center",
-              "valign": "middle"
+              "area": [180, 0, 240, 40]
             },
             "destination": {
               "text": "Farley",
               "font": "johnston100-31",
-              "colour": "#DB7700",
-              "from_X": 0,
-              "to_X": 180,
-              "front_Y": 0,
-              "to_Y": 25,
-              "align": "center",
-              "valign": "middle"
+              "area": [0, 0, 180, 25]
             },
             "via": {
               "text": "part route",
               "font": "johnston100-20",
-              "colour": "#DB7700",
-              "from_X": 0,
-              "to_X": 180,
-              "front_Y": 21,
-              "to_Y": 41,
-              "align": "center",
-              "valign": "middle"
+              "area": [0, 21, 180, 41]
             }
           }
         }

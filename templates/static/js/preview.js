@@ -19,6 +19,10 @@
  *     valigns: { number: 'top'|'middle'|'bottom', ... },
  *     spacings: { number: { lineHeight: px|null, lineGap: px, letterSpacing: px, spaceWidth: px|null }, ... },
  *     images: [{ src: 'bitmaps/shared/logo.png', x, y, w?, h? }, ...] }
+ *     scroll: { destination: bool, via: bool } (marquee when the text
+ *       overflows its box; ignored otherwise),
+ *     scrollOffsets: { key: px shift } (one animation frame; 0 = start)
+ * }
  *
  * dots=true renders round LED pixels with gaps (like the real board);
  * guides=true outlines each element's box in its own colour.
@@ -174,7 +178,7 @@
         return pen - x;
     }
 
-    function drawString(ctx, font, str, box, align, valign, color, spacing) {
+    function drawString(ctx, font, str, box, align, valign, color, spacing, scroll, scrollX) {
         if (!str) return 0;
         var sp = spacing || {};
         var tracking = parseInt(sp.letterSpacing, 10);
@@ -184,11 +188,25 @@
             ? null : parseInt(sp.spaceWidth, 10);
         if (spaceW !== null && (isNaN(spaceW) || spaceW < 0 || spaceW > 64)) spaceW = null;
         var lines = String(str).split(/\r?\n/);
+        if (scroll && lines.length > 1) {
+            // Scrolling is one horizontal line: join rows so nothing is lost.
+            str = lines.join(' ');
+            lines = [str];
+        }
         if (lines.length <= 1) {
             var m = measureString(font, str, tracking, spaceW);
-            var x = box.x;
-            if (align === 'center') x = Math.round(box.x + (box.w - m.width) / 2);
-            else if (align === 'right') x = Math.round(box.x + box.w - m.width);
+            var shift = Math.round(scrollX) || 0;
+            var x;
+            if (scroll && m.width > box.w) {
+                // Scrolling overflow: pin left and slide (offset 0 shows
+                // the head). Centering the rest position would start the
+                // text halfway scrolled and double-jump.
+                x = box.x - shift;
+            } else {
+                x = box.x;
+                if (align === 'center') x = Math.round(box.x + (box.w - m.width) / 2);
+                else if (align === 'right') x = Math.round(box.x + box.w - m.width);
+            }
             var baseline = Math.round(box.y + box.h + m.bottom);
             if (valign === 'top') baseline = Math.round(box.y + m.top);
             else if (valign === 'middle') baseline = Math.round(box.y + box.h / 2 + (m.top + m.bottom) / 2);
@@ -242,13 +260,13 @@
         return maxWidth;
     }
 
-    function drawRegion(ctx, font, text, box, align, valign, color, spacing) {
+    function drawRegion(ctx, font, text, box, align, valign, color, spacing, scroll, scrollX) {
         ctx.save();
         ctx.beginPath();
         ctx.rect(box.x, box.y, box.w, box.h);
         ctx.clip();
         if (font && text) {
-            drawString(ctx, font, text, box, align || 'left', valign || 'bottom', color, spacing);
+            drawString(ctx, font, text, box, align || 'left', valign || 'bottom', color, spacing, scroll, scrollX);
         } else if (text) {
             // BDF unavailable: monospace fallback, same box + alignment.
             // Supports "\n" by splitting into rows within the box.
@@ -298,7 +316,9 @@
                 (opts.aligns && opts.aligns[item.key]) || 'center',
                 (opts.valigns && opts.valigns[item.key]) || 'middle',
                 opts.colors[item.key],
-                (opts.spacings && opts.spacings[item.key]) || null);
+                (opts.spacings && opts.spacings[item.key]) || null,
+                !!(opts.scroll && opts.scroll[item.key]),
+                (opts.scrollOffsets && opts.scrollOffsets[item.key]) || 0);
         });
         // Positioned bitmap overlays, drawn in order over the text.
         // imageSmoothing is off so scaled logos stay crisp like the board's
@@ -486,8 +506,26 @@
         });
     }
 
+    // One-shot text width for scroll planning (single line; multi-line
+    // is joined like the renderer does). Resolves 0 when the font is
+    // unavailable. Fonts stay cached, so repeat calls are cheap.
+    function measure(text, fontName, size, tracking, spaceW) {
+        var line = String(text == null ? '' : text).split(/\r?\n/).join(' ');
+        if (!line || !fontName) return Promise.resolve(0);
+        return loadFont(fontName, size).then(function (font) {
+            if (!font) return 0;
+            var tr = parseInt(tracking, 10);
+            if (isNaN(tr)) tr = 0;
+            var sw = (spaceW === undefined || spaceW === null || spaceW === '')
+                ? null : parseInt(spaceW, 10);
+            if (sw !== null && (isNaN(sw) || sw < 0 || sw > 64)) sw = null;
+            return measureString(font, line, tr, sw).width;
+        });
+    }
+
     window.NSLPreview = {
         render: render,
+        measure: measure,
         _parseBDF: parseBDF,
         _measureString: measureString,
         _drawString: drawString,

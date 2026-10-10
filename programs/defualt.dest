@@ -3,13 +3,13 @@
     "colour": "#DB7700",
     "rotation_speed": 3,
     "px_width": 240,
-    "px_height": 40
+    "px_height": 40,
+    "version": 2
   },
   "services": {
     "0": {
       "Not in Service": {
         "service_code": "000",
-        "service_name": "Not in Service",
         "bitmaps": [
           "bitmaps/programs/defualt/0/noroute-not-in-service.png"
         ]
@@ -18,99 +18,61 @@
     "1": {
       "Burton": {
         "service_code": "101",
-        "service_name": "Burton",
         "text": {
           "0:": {
             "number": {
               "text": "1",
               "font": "johnston100-45",
-              "colour": "#DB7700",
-              "from_X": 210,
-              "to_X": 240,
-              "front_Y": 0,
-              "to_Y": 40
+              "area": [210, 0, 240, 40]
             },
             "destination": {
               "text": "Tutbury",
               "font": "johnston100-31",
-              "colour": "#DB7700",
-              "from_X": 0,
-              "to_X": 210,
-              "front_Y": 0,
-              "to_Y": 25
+              "area": [0, 0, 210, 25]
             },
             "via": {
               "text": "Stretton Rolleston",
               "font": "johnston100-20",
-              "colour": "#DB7700",
-              "from_X": 0,
-              "to_X": 210,
-              "front_Y": 25,
-              "to_Y": 40
+              "area": [0, 25, 210, 40]
             }
           },
           "3:": {
             "number": {
               "text": "",
               "font": "johnston100-45",
-              "colour": "#DB7700",
-              "from_X": 210,
-              "to_X": 240,
-              "front_Y": 0,
-              "to_Y": 40
+              "area": [210, 0, 240, 40]
             },
             "destination": {
               "text": "the tutbury jinnie",
               "font": "johnston100-29",
-              "colour": "#DB7700",
-              "from_X": 0,
-              "to_X": 240,
-              "front_Y": 0,
-              "to_Y": 40
+              "area": [0, 0, 240, 40]
             },
             "via": {
               "text": "",
               "font": "johnston100-20",
-              "colour": "#DB7700",
-              "from_X": 0,
-              "to_X": 210,
-              "front_Y": 25,
-              "to_Y": 40
+              "area": [0, 25, 210, 40]
             }
           }
         }
       },
       "Tutbury": {
         "service_code": "102",
-        "service_name": "Tutbury",
         "text": {
           "0:": {
             "number": {
               "text": "1",
               "font": "johnston100-45",
-              "colour": "#DB7700",
-              "from_X": 210,
-              "to_X": 240,
-              "front_Y": 0,
-              "to_Y": 40
+              "area": [210, 0, 240, 40]
             },
             "destination": {
               "text": "Burton",
               "font": "johnston100-31",
-              "colour": "#DB7700",
-              "from_X": 0,
-              "to_X": 210,
-              "front_Y": 0,
-              "to_Y": 25
+              "area": [0, 0, 210, 25]
             },
             "via": {
               "text": "Stretton",
               "font": "johnston100-20",
-              "colour": "#DB7700",
-              "from_X": 0,
-              "to_X": 210,
-              "front_Y": 25,
-              "to_Y": 40
+              "area": [0, 25, 210, 40]
             }
           }
         }

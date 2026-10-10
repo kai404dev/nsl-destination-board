@@ -425,6 +425,18 @@
     margin-left: auto;
 }
 
+.service-head .scroll-badge {
+    flex-shrink: 0;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--accent, #DB7700);
+    border: 1px solid var(--accent, #DB7700);
+    border-radius: 20px;
+    padding: 0.1rem 0.5rem;
+    white-space: nowrap;
+}
+
 .paste-btn {
     margin-left: auto;
     flex-shrink: 0;

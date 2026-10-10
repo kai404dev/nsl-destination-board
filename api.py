@@ -7,6 +7,15 @@ Font layout on disk::
     e.g. fonts/johnston100/johnston100-31.bdf
 
 Program files live in ``programs/*.dest`` (JSON, see defualt.dest).
+
+Program versions: v1 spells every element field out (``from_X``/``to_X``/
+``front_Y``/``to_Y``, ``align``/``valign``, ``line_height``/``line_gap``/
+``letter_spacing``/``space_width``). v2 packs them into arrays (``area``,
+``alignment``, ``spacing``) and drops anything repeating the defaults
+(``colour``, ``service_name``, empty codes, ``x``/``y`` == 0). Files
+without ``defaults.version`` are v1; ``"version": 2`` marks v2. The API
+always serves expanded (canonical v1) programs and compacts back to v2
+on every save, so old files, the board and the Studio JS keep working.
 """
 
 from __future__ import annotations
@@ -106,7 +115,7 @@ def list_programs(programs_dir: Path) -> list[str]:
 
 
 def load_program(programs_dir: Path, name: str) -> dict | None:
-    """Return the parsed program dict, or None if missing/invalid."""
+    """Return the parsed program dict (expanded to canonical v1), or None."""
     path = _program_path(programs_dir, name)
     if path is None or not path.is_file():
         return None
@@ -114,16 +123,29 @@ def load_program(programs_dir: Path, name: str) -> dict | None:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
-    return data if isinstance(data, dict) else None
+    if not isinstance(data, dict):
+        return None
+    try:
+        return expand_program(data)
+    except Exception:
+        return None
 
 
 def save_program(programs_dir: Path, name: str, data: dict) -> tuple[bool, str]:
-    """Atomically overwrite an existing program. Returns (ok, message)."""
+    """Overwrite an existing program, storing it as compact v2.
+
+    Accepts v1, v2 or mixed input: it is expanded to canonical v1 first,
+    then validated/normalised as before. Returns (ok, message).
+    """
     path = _program_path(programs_dir, name)
     if path is None:
         return False, "invalid program name"
     if not path.is_file():
         return False, "program not found"
+    try:
+        data = expand_program(data) if isinstance(data, dict) else data
+    except Exception:
+        return False, "program must be an object with a 'services' object"
     if not isinstance(data, dict) or not isinstance(data.get("services"), dict):
         return False, "program must be an object with a 'services' object"
     # Normalise positioned page bitmaps + line spacing so files stay clean.
@@ -187,12 +209,332 @@ def save_program(programs_dir: Path, name: str, data: dict) -> tuple[bool, str]:
     except Exception:
         pass
     try:
+        out = compact_program(data)
         tmp = path.with_suffix(".dest.tmp")
-        tmp.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+        tmp.write_text(dumps_program(out), encoding="utf-8")
         tmp.replace(path)
     except OSError as exc:
         return False, f"cannot write program: {exc} (see ReadMe 'Service permissions')"
     return True, "saved"
+
+
+# ---------------------------------------------------------------------------
+# Program versions: v1 (verbose keys) <-> v2 (compact arrays).
+#
+# v1 element (every field spelled out)::
+#
+#     {"text": "Tutbury", "font": "johnston100-31", "colour": "#DB7700",
+#      "from_X": 0, "to_X": 210, "front_Y": 0, "to_Y": 25,
+#      "align": "center", "valign": "middle", "line_height": 16, ...}
+#
+# v2 element (same data, packed)::
+#
+#     {"text": "Tutbury", "font": "johnston100-31",
+#      "area": [0, 0, 210, 25]}              # [x1, y1, x2, y2]
+#
+# ``alignment`` is [align, valign] (default ["center", "middle"]) and
+# ``spacing`` is [line_height(auto=null), line_gap, letter_spacing,
+# space_width(null)] (default [null, 0, 0, null]). Arrays may be shortened
+# from the right while the dropped slots equal the defaults, and the whole
+# key is dropped when everything is default. ``colour`` is dropped when it
+# equals ``defaults.colour``, ``service_name`` when it equals the
+# destination key, empty ``service_code``s, and image ``x``/``y`` when 0.
+# A ``"scroll": true`` element flag survives as-is in both versions:
+# over-wide destination/via text scrolls left like a blind instead of
+# being clipped (only engages when the text overflows its box).
+# ---------------------------------------------------------------------------
+
+PROGRAM_VERSION = 2
+
+_ALIGN_DEFAULTS = ("center", "middle")
+# [line_height (None = auto), line_gap, letter_spacing, space_width (None)]
+_SPACING_DEFAULTS = (None, 0, 0, None)
+
+
+def program_version(data: dict) -> int:
+    """Return 2 for v2 programs, else 1 (a missing flag means v1)."""
+    try:
+        return int((data.get("defaults") or {}).get("version", 1))
+    except (TypeError, ValueError, AttributeError):
+        return 1
+
+
+def _v2_int(value, fallback: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return fallback
+
+
+def dumps_program(data: dict) -> str:
+    """Serialise a program dict, keeping short arrays on one line.
+
+    Plain ``indent=2`` would explode every ``"area": [x1, y1, x2, y2]``
+    over six lines; this collapses the known short value arrays
+    (``area``/``alignment``/``spacing``) back onto one line each.
+    Arrays containing nested brackets are left alone.
+    """
+    raw = json.dumps(data, indent=2)
+
+    def _inline(m: re.Match) -> str:
+        inner = re.sub(r"\s+", " ", m.group(2)).strip()
+        inner = re.sub(r",\s*", ", ", inner)
+        return f'"{m.group(1)}": [{inner}]'
+
+    return re.sub(r'"(area|alignment|spacing)": \[([^\[\]]*?)\]',
+                  _inline, raw) + "\n"
+
+
+def _expand_element(el: dict, default_colour: str) -> dict:
+    """Expand one v1/v2/mixed element to canonical v1 keys (new keys win)."""
+    if not isinstance(el, dict):
+        return el
+    out = dict(el)
+    area = out.pop("area", None)
+    if isinstance(area, (list, tuple)) and len(area) >= 4:
+        for _k in ("from_X", "to_X", "front_Y", "from_Y", "to_Y"):
+            out.pop(_k, None)
+        out["from_X"] = _v2_int(area[0])
+        out["front_Y"] = _v2_int(area[1])
+        out["to_X"] = _v2_int(area[2])
+        out["to_Y"] = _v2_int(area[3])
+    alignment = out.pop("alignment", None)
+    if isinstance(alignment, (list, tuple)) and alignment:
+        out.pop("align", None)
+        out.pop("valign", None)
+        if len(alignment) > 0 and alignment[0]:
+            out["align"] = str(alignment[0])
+        if len(alignment) > 1 and alignment[1]:
+            out["valign"] = str(alignment[1])
+    spacing = out.pop("spacing", None)
+    if isinstance(spacing, (list, tuple)) and spacing:
+        for _k in ("line_height", "line_gap", "letter_spacing", "space_width"):
+            out.pop(_k, None)
+        vals = [spacing[i] if i < len(spacing) else _SPACING_DEFAULTS[i]
+                for i in range(4)]
+        if vals[0] not in (None, ""):
+            try:
+                out["line_height"] = int(vals[0])
+            except (TypeError, ValueError):
+                pass
+        for _k, _v in (("line_gap", vals[1]), ("letter_spacing", vals[2])):
+            try:
+                _iv = int(_v)
+            except (TypeError, ValueError):
+                continue
+            if _iv != 0:
+                out[_k] = _iv
+        if vals[3] not in (None, ""):
+            try:
+                out["space_width"] = int(vals[3])
+            except (TypeError, ValueError):
+                pass
+    if "colour" not in out and default_colour:
+        out["colour"] = default_colour
+    if out.get("scroll"):
+        out["scroll"] = True
+    else:
+        out.pop("scroll", None)
+    return out
+
+
+def _expand_image(im: dict) -> dict:
+    """Fill image x/y defaults so canonical pages are fully explicit."""
+    if not isinstance(im, dict):
+        return im
+    out = dict(im)
+    out.setdefault("x", 0)
+    out.setdefault("y", 0)
+    return out
+
+
+def expand_program(data: dict) -> dict:
+    """Expand a v1/v2/mixed program dict to canonical v1 (verbose keys)."""
+    if not isinstance(data, dict):
+        raise ValueError("program must be an object")
+    out = dict(data)
+    defaults = dict(data.get("defaults") or {})
+    out["defaults"] = defaults
+    default_colour = defaults.get("colour", "")
+    services = data.get("services")
+    if not isinstance(services, dict):
+        return out
+    new_services = {}
+    for svc, group in services.items():
+        if not isinstance(group, dict):
+            new_services[svc] = group
+            continue
+        new_group = {}
+        for name, dest in group.items():
+            if not isinstance(dest, dict):
+                new_group[name] = dest
+                continue
+            new_dest = dict(dest)
+            if not new_dest.get("service_code"):
+                new_dest["service_code"] = ""
+            if not new_dest.get("service_name"):
+                new_dest["service_name"] = name
+            text = new_dest.get("text")
+            if isinstance(text, dict):
+                new_text = {}
+                for pk, page in text.items():
+                    if not isinstance(page, dict):
+                        new_text[pk] = page
+                        continue
+                    new_page = dict(page)
+                    for ek in ("number", "destination", "via"):
+                        if isinstance(new_page.get(ek), dict):
+                            new_page[ek] = _expand_element(new_page[ek],
+                                                           default_colour)
+                    if isinstance(new_page.get("images"), list):
+                        new_page["images"] = [_expand_image(im)
+                                              for im in new_page["images"]]
+                    new_text[pk] = new_page
+                new_dest["text"] = new_text
+            new_group[name] = new_dest
+        new_services[svc] = new_group
+    out["services"] = new_services
+    return out
+
+
+def _trim_trailing(vals: list, defaults) -> list:
+    """Drop trailing slots equal to the defaults (for partial arrays)."""
+    vals = list(vals)
+    while vals and vals[-1] == defaults[len(vals) - 1]:
+        vals.pop()
+    return vals
+
+
+def _compact_opt_int(value, default):
+    """Coerce an optional spacing slot, falling back to its default."""
+    if value in (None, ""):
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _compact_element(el: dict, default_colour: str) -> dict:
+    """Pack one canonical v1 element into the compact v2 shape."""
+    if not isinstance(el, dict):
+        return el
+    out = {"text": el.get("text", ""), "font": el.get("font", "")}
+    colour = el.get("colour", "")
+    if not (default_colour and str(colour).lower() == str(default_colour).lower()):
+        out["colour"] = colour
+    y = el["front_Y"] if "front_Y" in el else el.get("from_Y", 0)
+    out["area"] = [_v2_int(el.get("from_X")), _v2_int(y),
+                   _v2_int(el.get("to_X")), _v2_int(el.get("to_Y"))]
+    alignment = _trim_trailing([el.get("align", "center"),
+                                el.get("valign", "middle")],
+                               list(_ALIGN_DEFAULTS))
+    if alignment:
+        out["alignment"] = alignment
+    lh = el.get("line_height")
+    try:
+        lh = int(lh) if lh not in (None, "") else None
+    except (TypeError, ValueError):
+        lh = None
+    spacing = _trim_trailing([lh,
+                              _compact_opt_int(el.get("line_gap"), 0),
+                              _compact_opt_int(el.get("letter_spacing"), 0),
+                              _compact_opt_int(el.get("space_width"), None)],
+                             list(_SPACING_DEFAULTS))
+    if spacing:
+        out["spacing"] = spacing
+    if el.get("scroll"):
+        out["scroll"] = True
+    # Pass through anything unexpected so saves never lose data.
+    for k, v in el.items():
+        if k not in out and k not in ("from_X", "to_X", "front_Y", "from_Y",
+                                      "to_Y", "align", "valign", "line_height",
+                                      "line_gap", "letter_spacing",
+                                      "space_width", "scroll", "area", "alignment",
+                                      "spacing", "text", "font", "colour"):
+            out[k] = v
+    return out
+
+
+def _compact_image(im: dict) -> dict:
+    """Pack one image spec, dropping x/y when 0 (readers default to 0)."""
+    if not isinstance(im, dict):
+        return im
+    out = {"src": str(im.get("src") or "")}
+    if _v2_int(im.get("x", 0)):
+        out["x"] = _v2_int(im.get("x", 0))
+    if _v2_int(im.get("y", 0)):
+        out["y"] = _v2_int(im.get("y", 0))
+    for k in ("w", "h"):
+        v = im.get(k)
+        if v in (None, ""):
+            continue
+        try:
+            iv = int(v)
+        except (TypeError, ValueError):
+            continue
+        if 1 <= iv <= 1024:
+            out[k] = iv
+    for k, v in im.items():
+        if k not in ("src", "x", "y", "w", "h") and k not in out:
+            out[k] = v
+    return out
+
+
+def compact_program(data: dict) -> dict:
+    """Pack a canonical v1 program dict into the compact v2 shape."""
+    if not isinstance(data, dict):
+        raise ValueError("program must be an object")
+    defaults = dict(data.get("defaults") or {})
+    defaults["version"] = PROGRAM_VERSION
+    default_colour = defaults.get("colour", "")
+    out = dict(data)
+    out["defaults"] = defaults
+    services = data.get("services")
+    if not isinstance(services, dict):
+        return out
+    new_services = {}
+    for svc, group in services.items():
+        if not isinstance(group, dict):
+            new_services[svc] = group
+            continue
+        new_group = {}
+        for name, dest in group.items():
+            if not isinstance(dest, dict):
+                new_group[name] = dest
+                continue
+            new_dest = {}
+            code = str(dest.get("service_code") or "")
+            if code:
+                new_dest["service_code"] = code
+            if dest.get("service_name") not in (None, "") \
+                    and dest.get("service_name") != name:
+                new_dest["service_name"] = dest["service_name"]
+            for k, v in dest.items():
+                if k in ("service_code", "service_name"):
+                    continue
+                new_dest[k] = v
+            text = new_dest.get("text")
+            if isinstance(text, dict):
+                new_text = {}
+                for pk, page in text.items():
+                    if not isinstance(page, dict):
+                        new_text[pk] = page
+                        continue
+                    new_page = dict(page)
+                    for ek in ("number", "destination", "via"):
+                        if isinstance(new_page.get(ek), dict):
+                            new_page[ek] = _compact_element(new_page[ek],
+                                                            default_colour)
+                    if isinstance(new_page.get("images"), list):
+                        new_page["images"] = [_compact_image(im)
+                                              for im in new_page["images"]]
+                    new_text[pk] = new_page
+                new_dest["text"] = new_text
+            new_group[name] = new_dest
+        new_services[svc] = new_group
+    out["services"] = new_services
+    return out
 
 
 PROGRAM_TEMPLATE = {
@@ -201,6 +543,7 @@ PROGRAM_TEMPLATE = {
         "rotation_speed": 3,
         "px_width": 240,
         "px_height": 40,
+        "version": 2,
     },
     "services": {},
 }
@@ -216,7 +559,7 @@ def create_program(programs_dir: Path, name: str) -> tuple[bool, str]:
     try:
         programs_dir.mkdir(parents=True, exist_ok=True)
         tmp = path.with_suffix(".dest.tmp")
-        tmp.write_text(json.dumps(PROGRAM_TEMPLATE, indent=2) + "\n", encoding="utf-8")
+        tmp.write_text(dumps_program(PROGRAM_TEMPLATE), encoding="utf-8")
         tmp.replace(path)
     except OSError as exc:
         return False, f"cannot write program: {exc}"

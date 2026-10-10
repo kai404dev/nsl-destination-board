@@ -298,20 +298,38 @@ def _line_spacing(el: dict, font: dict, measures: list) -> tuple[int, int, int]:
     return base, max(1, base + gap), ascent
 
 
+def _scroll_flag(el: dict | None) -> bool:
+    """True when an element opts into marquee scrolling on overflow."""
+    return bool((el or {}).get("scroll"))
+
+
 def _draw_string(px, W: int, H: int, font: dict, s: str,
-                 box: dict, align: str, valign: str, colour, el: dict | None = None) -> None:
+                 box: dict, align: str, valign: str, colour, el: dict | None = None,
+                 offset: float = 0) -> None:
     if not s:
         return
     tracking = _letter_spacing(el)
     space_w = _space_width(el)
     lines = str(s).split("\n")
+    if _scroll_flag(el) and len(lines) > 1:
+        # A scrolling element is one horizontal line: join rows with a
+        # space so no content is lost instead of stacking them.
+        lines = [" ".join(lines)]
+        s = lines[0]
     if len(lines) <= 1:
         m = measure_string(font, s, tracking, space_w)
-        x = box["x"]
-        if align == "center":
-            x = _round_half_up(box["x"] + (box["w"] - m["width"]) / 2)
-        elif align == "right":
-            x = _round_half_up(box["x"] + box["w"] - m["width"])
+        shift = int(round(offset)) if offset else 0
+        if _scroll_flag(el) and m["width"] > box["w"]:
+            # Scrolling overflow: pin to the left and slide (offset 0 shows
+            # the head), ignoring alignment - centering the rest position
+            # would start the text halfway scrolled and double-jump.
+            x = box["x"] - shift
+        else:
+            x = box["x"]
+            if align == "center":
+                x = _round_half_up(box["x"] + (box["w"] - m["width"]) / 2)
+            elif align == "right":
+                x = _round_half_up(box["x"] + box["w"] - m["width"])
         baseline = _round_half_up(box["y"] + box["h"] + m["bottom"])
         if valign == "top":
             baseline = _round_half_up(box["y"] + m["top"])
@@ -407,8 +425,14 @@ def _draw_page_images(img, page: dict) -> None:
 
 
 def render_text_page(page: dict, W: int = 240, H: int = 40,
-                     fonts_dir: Path = FONTS_DIR):
-    """Render one text page to a Pillow RGB image (WxH)."""
+                     fonts_dir: Path = FONTS_DIR,
+                     offsets: dict | None = None):
+    """Render one text page to a Pillow RGB image (WxH).
+
+    *offsets* maps element keys (``destination``/``via``/``number``) to a
+    horizontal scroll shift in px for one animation frame - omitted or 0
+    renders the static page exactly as before.
+    """
     from PIL import Image
 
     img = Image.new("RGB", (W, H), "black")
@@ -428,7 +452,8 @@ def render_text_page(page: dict, W: int = 240, H: int = 40,
         align = _one_of(el.get("align"), ("left", "center", "right"), "center")
         valign = _one_of(el.get("valign"), ("top", "middle", "bottom"), "middle")
         _draw_string(px, W, H, font, text, box, align, valign,
-                     parse_colour(el.get("colour")), el)
+                     parse_colour(el.get("colour")), el,
+                     (offsets or {}).get(key, 0))
     _draw_page_images(img, page)
     return img
 
@@ -446,6 +471,35 @@ def render_bitmap(path: Path, W: int = 240, H: int = 40):
 # ---------------------------------------------------------------------------
 # Playlist: destination -> ordered list of ("text", page) / ("bitmap", path)
 # ---------------------------------------------------------------------------
+
+def page_scrolls(page: dict, W: int = 240, H: int = 40,
+                 fonts_dir: Path = FONTS_DIR) -> dict:
+    """Return scroll play info for elements flagged ``"scroll": true``.
+
+    Result maps element keys to ``{"width", "distance"}`` - only for
+    elements whose single-line text is wider than its box. Flagged text
+    that fits renders statically, so this is empty for normal pages.
+    """
+    out = {}
+    for key in ("destination", "via", "number"):
+        el = (page or {}).get(key) or {}
+        if not _scroll_flag(el):
+            continue
+        text = el.get("text") or ""
+        if not text:
+            continue
+        name, size = split_font(el.get("font"))
+        font = load_font(fonts_dir, name, size)
+        if font is None:
+            continue
+        line = str(text).replace("\r\n", " ").replace("\n", " ").replace("\r", " ")
+        width = measure_string(font, line,
+                               _letter_spacing(el), _space_width(el))["width"]
+        box = element_box(el, W, H)
+        if width > box["w"]:
+            out[key] = {"width": width, "distance": width - box["w"]}
+    return out
+
 
 def _page_sort_key(key: str) -> tuple:
     import re
@@ -551,6 +605,9 @@ def _read_selection() -> dict:
 
 WIPE_SECONDS = 3.0  # blank pause when switching to a new destination
 
+SCROLL_HOLD_SECONDS = 0.8  # readable pause at each end of a scroll run
+SCROLL_STEP_SECONDS = 0.12  # frame time while scrolling (also the cut-in granularity)
+
 
 def _wait_while_selected(seconds: float, sel: dict, previewing: bool = False) -> bool:
     """Sleep up to *seconds*, waking early on selection/preview changes.
@@ -568,6 +625,39 @@ def _wait_while_selected(seconds: float, sel: dict, previewing: bool = False) ->
             return True
         if _read_selection() != sel:
             return True
+    return False
+
+
+def _play_scrolling(matrix, page: dict, W: int, H: int,
+                   phys_w: int, phys_h: int, scrolls: dict,
+                   seconds: float, sel: dict) -> bool:
+    """Animate one scrolling text page for ~*seconds* on the matrix.
+
+    Holds the start position, slides every scrolling element left in sync
+    (each travels its own overflow distance), holds the end position, then
+    returns False. Returns True when a new selection or preview cut in
+    (the caller should re-resolve instead of advancing).
+    """
+    from PIL import Image
+
+    def _show(offsets: dict) -> None:
+        img = render_text_page(page, W, H, offsets=offsets)
+        if img.size != (phys_w, phys_h):
+            img = img.resize((phys_w, phys_h), Image.NEAREST)
+        matrix.SetImage(img.convert("RGB"))
+
+    hold = min(SCROLL_HOLD_SECONDS, max(0.0, seconds / 4))
+    steps = max(1, int(round(max(0.2, seconds - 2 * hold) / SCROLL_STEP_SECONDS)))
+    _show({})
+    if _wait_while_selected(hold, sel):
+        return True
+    for i in range(1, steps + 1):
+        frac = i / steps
+        _show({k: v["distance"] * frac for k, v in scrolls.items()})
+        if _wait_while_selected(SCROLL_STEP_SECONDS, sel):
+            return True
+    if _wait_while_selected(hold, sel):
+        return True
     return False
 
 
@@ -662,13 +752,24 @@ def run_board(args) -> None:
             if not frames:
                 continue
         kind, payload = frames[idx]
+        scrolled = False
         try:
             W = (program.get("defaults") or {}).get("px_width", 240) if program else 240
             H = (program.get("defaults") or {}).get("px_height", 40) if program else 40
             W = args.panel_width or int(W or 240)
             H = int(H or 40)
             if kind == "text":
-                img = render_text_page(payload, W, H)
+                scrolls = page_scrolls(payload, W, H)
+                if scrolls:
+                    if _play_scrolling(matrix, payload, W, H,
+                                       phys_w, phys_h, scrolls, speed, sel):
+                        continue  # cut in: re-resolve, don't advance
+                    scrolled = True  # slot time already spent scrolling
+                else:
+                    img = render_text_page(payload, W, H)
+                    if img.size != (phys_w, phys_h):
+                        img = img.resize((phys_w, phys_h), Image.NEAREST)
+                    matrix.SetImage(img.convert("RGB"))
             else:
                 try:
                     img = render_bitmap(Path(payload), W, H)
@@ -676,12 +777,14 @@ def run_board(args) -> None:
                     print(f"Board: cannot load bitmap {payload}: {exc}")
                     from PIL import Image as _I
                     img = _I.new("RGB", (W, H), "black")
-            if img.size != (phys_w, phys_h):
-                img = img.resize((phys_w, phys_h), Image.NEAREST)
-            matrix.SetImage(img.convert("RGB"))
+                if img.size != (phys_w, phys_h):
+                    img = img.resize((phys_w, phys_h), Image.NEAREST)
+                matrix.SetImage(img.convert("RGB"))
         except Exception as exc:  # keep the loop alive on bad frames
             print(f"Board: render error on frame {idx}: {exc}")
         idx += 1
+        if scrolled:
+            continue  # next frame now; no extra dwell
         # Sleep in small slices so a controller change (or preview) cuts in.
         if _wait_while_selected(speed, sel):
             idx = min(idx, max(0, len(frames) - 1))

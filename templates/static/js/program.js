@@ -237,6 +237,18 @@
         return null;
     }
 
+    // True when any page of a destination flags scrolling text.
+    function destinationScrolls(destination) {
+        var pages = servicePages(destination);
+        if (!pages) return false;
+        return Object.keys(pages).some(function (pageKey) {
+            var page = pages[pageKey] || {};
+            return ['number', 'destination', 'via'].some(function (k) {
+                return !!(page[k] && page[k].scroll);
+            });
+        });
+    }
+
     function render(root) {
         var list = $(root, 'service-list');
         if (!list) return;
@@ -255,8 +267,11 @@
                 html += '<div class="service"><div class="service-head"><strong>' + esc(name) + '</strong>' +
                     '<input type="text" class="code-edit" data-service="' + esc(service) +
                     '" data-destination="' + esc(name) + '" value="' + esc(destination.service_code || '') +
-                    '" maxlength="12" spellcheck="false" aria-label="Service code for ' + esc(name) + '">' +
-                    '<button type="button" class="danger-ghost" data-action="delete-destination" data-service="' + esc(service) +
+                    '" maxlength="12" spellcheck="false" aria-label="Service code for ' + esc(name) + '">';
+                if (destinationScrolls(destination)) {
+                    html += '<span class="scroll-badge" title="Destination or via text scrolls when too wide">scroll</span>';
+                }
+                html += '<button type="button" class="danger-ghost" data-action="delete-destination" data-service="' + esc(service) +
                     '" data-destination="' + esc(name) + '" aria-label="Delete destination ' + esc(name) + '">Delete</button>';
                 if (clipboard) {
                     html += '<button type="button" class="paste-btn" data-action="paste-page" data-service="' + esc(service) +
@@ -419,6 +434,7 @@
         if (sw !== null && !isNaN(sw)) {
             out.space_width = Math.max(0, Math.min(64, sw));
         }
+        if (el.scroll) out.scroll = true;
         return out;
     }
 
@@ -706,6 +722,7 @@
                 lineGap: Math.max(-64, Math.min(200, lg)),
                 letterSpacing: Math.max(-20, Math.min(40, ls)),
                 spaceWidth: sw,
+                scroll: !!el.scroll,
                 box: boxOf(el, fb)
             };
         }

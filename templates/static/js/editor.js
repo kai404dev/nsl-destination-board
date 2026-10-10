@@ -18,9 +18,9 @@
         { key: 'number', textId: null, fontId: 'number-font', sizeId: 'number-size', colorId: 'number-color',
           xId: 'number-x', yId: 'number-y', wId: 'number-w', hId: 'number-h', alignId: 'number-align', valignId: 'number-valign', lhId: 'number-lh', lgId: 'number-lg', lsId: 'number-ls', spaceId: 'number-sp' },
         { key: 'destination', textId: 'sign-destination', fontId: 'dest-font', sizeId: 'dest-size', colorId: 'dest-color',
-          xId: 'dest-x', yId: 'dest-y', wId: 'dest-w', hId: 'dest-h', alignId: 'dest-align', valignId: 'dest-valign', lhId: 'dest-lh', lgId: 'dest-lg', lsId: 'dest-ls', spaceId: 'dest-sp' },
+          xId: 'dest-x', yId: 'dest-y', wId: 'dest-w', hId: 'dest-h', alignId: 'dest-align', valignId: 'dest-valign', lhId: 'dest-lh', lgId: 'dest-lg', lsId: 'dest-ls', spaceId: 'dest-sp', scrollId: 'dest-scroll' },
         { key: 'via', textId: 'sign-via', fontId: 'via-font', sizeId: 'via-size', colorId: 'via-color',
-          xId: 'via-x', yId: 'via-y', wId: 'via-w', hId: 'via-h', alignId: 'via-align', valignId: 'via-valign', lhId: 'via-lh', lgId: 'via-lg', lsId: 'via-ls', spaceId: 'via-sp' }
+          xId: 'via-x', yId: 'via-y', wId: 'via-w', hId: 'via-h', alignId: 'via-align', valignId: 'via-valign', lhId: 'via-lh', lgId: 'via-lg', lsId: 'via-ls', spaceId: 'via-sp', scrollId: 'via-scroll' }
     ];
 
     // Quick-position presets (from_X/to_X/front_Y/to_Y scheme as in
@@ -62,8 +62,8 @@
         images: [],
         styles: {
             number: { font: '', size: '', color: '#DB7700', align: 'center', valign: 'middle', lineHeight: null, lineGap: 0, letterSpacing: 0, spaceWidth: null, box: { x: 180, y: 0, w: 60, h: 40 } },
-            destination: { font: '', size: '', color: '#DB7700', align: 'center', valign: 'middle', lineHeight: null, lineGap: 0, letterSpacing: 0, spaceWidth: null, box: { x: 0, y: 0, w: 180, h: 25 } },
-            via: { font: '', size: '', color: '#DB7700', align: 'center', valign: 'middle', lineHeight: null, lineGap: 0, letterSpacing: 0, spaceWidth: null, box: { x: 0, y: 25, w: 180, h: 15 } }
+            destination: { font: '', size: '', color: '#DB7700', align: 'center', valign: 'middle', lineHeight: null, lineGap: 0, letterSpacing: 0, spaceWidth: null, scroll: false, box: { x: 0, y: 0, w: 180, h: 25 } },
+            via: { font: '', size: '', color: '#DB7700', align: 'center', valign: 'middle', lineHeight: null, lineGap: 0, letterSpacing: 0, spaceWidth: null, scroll: false, box: { x: 0, y: 25, w: 180, h: 15 } }
         }
     };
 
@@ -162,6 +162,7 @@
                 lineGap: lineGapOf(root, group.lgId),
                 letterSpacing: letterSpacingOf(root, group.lsId),
                 spaceWidth: spaceWidthOf(root, group.spaceId),
+                scroll: !!(group.scrollId && $(root, group.scrollId) && $(root, group.scrollId).checked),
                 box: {
                     x: num(root, group.xId, 0, D.w - 1, fb.box.x),
                     y: num(root, group.yId, 0, D.h - 1, fb.box.y),
@@ -306,6 +307,10 @@
             setVal(root, group.lgId, saved.lineGap !== undefined && saved.lineGap !== null ? saved.lineGap : 0);
             setVal(root, group.lsId, saved.letterSpacing !== undefined && saved.letterSpacing !== null ? saved.letterSpacing : 0);
             setVal(root, group.spaceId, saved.spaceWidth !== undefined && saved.spaceWidth !== null ? saved.spaceWidth : '');
+            if (group.scrollId) {
+                var scrollEl = $(root, group.scrollId);
+                if (scrollEl) scrollEl.checked = !!saved.scroll;
+            }
             setBox(root, group, saved.box || fb.box);
             // Fonts + sizes resolve async; stash what to select once loaded.
             var fontEl = $(root, group.fontId);
@@ -538,6 +543,54 @@
         });
     }
 
+    // ---- Scroll preview: while a destination/via scroll flag is on, a
+    // 120ms timer re-renders the canvas with advancing offsets so the
+    // marquee plays live in the editor, like the board. Widths are
+    // measured async (fonts cache, so this is cheap after first load).
+    var scrollTick = 0;
+    var scrollTimer = null;
+    var scrollWidths = {}; // key -> { sig, width }
+    var SCROLL_HOLD_TICKS = 6;
+    var SCROLL_PX_PER_TICK = 2;
+
+    function stopScrollLoop() {
+        if (scrollTimer) {
+            clearInterval(scrollTimer);
+            scrollTimer = null;
+        }
+        scrollTick = 0;
+    }
+
+    function scrollSig(text, s, box) {
+        return [text, s.font, s.size, s.letterSpacing, s.spaceWidth, box.w].join('|');
+    }
+
+    function scrollOffsetFor(root, key, text, s, box) {
+        if (!s.scroll) return 0;
+        var cached = scrollWidths[key];
+        var sig = scrollSig(text, s, box);
+        if (!cached || cached.sig !== sig) {
+            scrollWidths[key] = { sig: sig, width: cached ? cached.width : 0 };
+            if (window.NSLPreview && window.NSLPreview.measure) {
+                window.NSLPreview.measure(text, s.font, s.size, s.letterSpacing, s.spaceWidth).then(function (w) {
+                    var cur = scrollWidths[key];
+                    if (cur && cur.sig === sig) cur.width = w;
+                });
+            }
+            return 0;
+        }
+        var distance = Math.max(0, (cached.width || 0) - box.w);
+        if (!distance) return 0;
+        var run = Math.ceil(distance / SCROLL_PX_PER_TICK);
+        var cycle = SCROLL_HOLD_TICKS * 2 + run;
+        var t = scrollTick % cycle;
+        if (t < SCROLL_HOLD_TICKS) return 0;
+        if (t < SCROLL_HOLD_TICKS + run) {
+            return Math.min(distance, (t - SCROLL_HOLD_TICKS) * SCROLL_PX_PER_TICK);
+        }
+        return distance;
+    }
+
     function renderPreview(root) {
         var canvas = root.querySelector('#sign-canvas');
         if (!canvas || !window.NSLPreview) return;
@@ -550,6 +603,8 @@
         var aligns = {};
         var valigns = {};
         var spacings = {};
+        var scrolls = {};
+        var scrollOffsets = {};
         GROUPS.forEach(function (group) {
             var s = state.styles[group.key];
             var fb = DEFAULTS.styles[group.key];
@@ -560,6 +615,23 @@
             valigns[group.key] = s.valign;
             spacings[group.key] = { lineHeight: s.lineHeight, lineGap: s.lineGap, letterSpacing: s.letterSpacing, spaceWidth: s.spaceWidth };
         });
+        var texts = { number: state.route, destination: state.destination, via: state.layout === 'none' ? '' : state.via };
+        GROUPS.forEach(function (group) {
+            var s = state.styles[group.key];
+            scrolls[group.key] = !!s.scroll;
+            scrollOffsets[group.key] = scrollOffsetFor(root, group.key, texts[group.key] || '', s, boxes[group.key]);
+        });
+        // Animate the marquee while any scroll flag is on; stop (and reset)
+        // when none is, so the canvas goes back to a static render.
+        var wantScroll = !!(state.styles.destination.scroll || state.styles.via.scroll);
+        if (wantScroll && !scrollTimer) {
+            scrollTimer = setInterval(function () {
+                scrollTick++;
+                renderPreview(root);
+            }, 120);
+        } else if (!wantScroll && scrollTimer) {
+            stopScrollLoop();
+        }
         window.NSLPreview.render(canvas, {
             layout: state.layout,
             number: state.route,
@@ -573,6 +645,8 @@
             aligns: aligns,
             valigns: valigns,
             spacings: spacings,
+            scroll: scrolls,
+            scrollOffsets: scrollOffsets,
             images: state.images || [],
             guides: state.guides,
             dots: state.dots
@@ -809,6 +883,8 @@
             var sw = parseInt(s.spaceWidth, 10);
             if (!isNaN(sw)) el.space_width = Math.max(0, Math.min(64, sw));
         }
+        // Marquee on overflow: board + preview scroll over-wide text.
+        if (s.scroll) el.scroll = true;
         return el;
     }
 
@@ -1396,6 +1472,7 @@
     }
 
     function refresh(root) {
+        stopScrollLoop(); // drop any timer bound to the previous partial DOM
         var draft = loadDraft();
         applyState(root, draft || defaultDraft());
         renderPreview(root);
