@@ -692,13 +692,13 @@ def splash_pages() -> list[dict]:
                        "align": "center", "valign": "middle"},
             "destination": {"text": "Displays", "font": "default-7x13B",
                             "colour": white,
-                            "from_X": 48, "to_X": 288, "front_Y": 13,
-                            "to_Y": 53, "align": "center", "valign": "middle"},
+                            "from_X": 63, "to_X": 303, "front_Y": 23,
+                            "to_Y": 63, "align": "center", "valign": "middle"},
             "via": {"text": "", "font": "johnston100-18", "colour": amber,
                     "from_X": 0, "to_X": 180, "front_Y": 25, "to_Y": 40,
                     "align": "center", "valign": "middle"},
             "images": [{"src": "bitmaps/shared/Next_Stop_Labs_Full_Logo.png",
-                        "x": 15, "y": 10, "w": 200, "h": 35}],
+                        "x": 0, "y": 0, "w": 200, "h": 35}],
         },
     ]
 
