@@ -674,6 +674,71 @@ def _play_scrolling(matrix, page: dict, W: int, H: int,
     return False
 
 
+SPLASH_PAGE_SECONDS = 5.0  # dwell per boot splash page (2 pages = 10s)
+
+
+def splash_pages() -> list[dict]:
+    """Built-in startup pages (moved out of defualt.dest's startup/start).
+
+    Canonical v1 element keys, rendered with the normal text renderer at
+    240x40 so the splash matches what the file version showed.
+    """
+    white = "#ffffff"
+    amber = "#DB7700"
+    return [
+        {
+            "number": {"text": "", "font": "johnston100-45", "colour": white,
+                       "from_X": 180, "to_X": 240, "front_Y": 0, "to_Y": 40,
+                       "align": "center", "valign": "middle"},
+            "destination": {"text": "Displays", "font": "default-7x13B",
+                            "colour": white,
+                            "from_X": 48, "to_X": 288, "front_Y": 13,
+                            "to_Y": 53, "align": "center", "valign": "middle"},
+            "via": {"text": "", "font": "johnston100-18", "colour": amber,
+                    "from_X": 0, "to_X": 180, "front_Y": 25, "to_Y": 40,
+                    "align": "center", "valign": "middle"},
+            "images": [{"src": "bitmaps/shared/Next_Stop_Labs_Full_Logo.png",
+                        "x": 0, "y": 0, "w": 200, "h": 35}],
+        },
+        {
+            "number": {"text": "Starting please wait", "font": "johnston100-26",
+                       "colour": white,
+                       "from_X": 0, "to_X": 240, "front_Y": 0, "to_Y": 40,
+                       "align": "center", "valign": "middle"},
+            "destination": {"text": "", "font": "default-7x13B",
+                            "colour": white,
+                            "from_X": 48, "to_X": 288, "front_Y": 13,
+                            "to_Y": 53, "align": "center", "valign": "middle"},
+            "via": {"text": "", "font": "johnston100-18", "colour": amber,
+                    "from_X": 0, "to_X": 180, "front_Y": 25, "to_Y": 40,
+                    "align": "center", "valign": "middle"},
+        },
+    ]
+
+
+def _play_splash(matrix, phys_w: int, phys_h: int,
+                 pages: list, sel: dict) -> bool:
+    """Play the boot splash, one page per SPLASH_PAGE_SECONDS.
+
+    Returns True when a new selection or preview cut in (the caller
+    re-resolves instead of dwelling).
+    """
+    from PIL import Image
+
+    for page in pages:
+        try:
+            img = render_text_page(page, 240, 40)
+        except Exception as exc:
+            print(f"Board: splash render error: {exc}")
+            continue
+        if img.size != (phys_w, phys_h):
+            img = img.resize((phys_w, phys_h), Image.NEAREST)
+        matrix.SetImage(img.convert("RGB"))
+        if _wait_while_selected(SPLASH_PAGE_SECONDS, sel):
+            return True
+    return False
+
+
 def run_board(args) -> None:
     """Main player loop: render frames, push to matrix, follow state file."""
     import api
@@ -688,6 +753,13 @@ def run_board(args) -> None:
           f"(rows={args.led_rows} cols={args.led_cols} chain={args.led_chain})")
     matrix.Clear()  # blank screen until the Controller picks a destination
     last_key = None
+    # Boot splash first: 5s per page, then the normal selection loop
+    # (which boots blank until the Controller picks - see main.py).
+    # Picking a destination (or previewing) during the splash cuts in.
+    sel = _read_selection()
+    _pages = splash_pages()
+    print(f"Board: startup splash ({len(_pages)} pages x {SPLASH_PAGE_SECONDS:g}s)")
+    _play_splash(matrix, phys_w, phys_h, _pages, sel)
     blank_notice_key = None  # last key we already logged a blank notice for
     previewing = False
     frames: list = []

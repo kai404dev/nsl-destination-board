@@ -4,7 +4,8 @@
     "rotation_speed": 3,
     "px_width": 240,
     "px_height": 40,
-    "version": 2
+    "version": 2,
+    "scroll_speed": 30
   },
   "services": {
     "0": {
