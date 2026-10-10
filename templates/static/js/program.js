@@ -118,7 +118,21 @@
     };
 
     // Module state for the currently open program.
-    var S = { name: '', data: null, dirty: false, lastSaved: 0 };
+    var S = { name: '', data: null, dirty: false, lastSaved: 0, version: 1, migratePending: false };
+
+    function progVersion(data) {
+        return (data && data.defaults && data.defaults.version) || 1;
+    }
+
+    // Badge the open program's file format; offer one-click migration
+    // for v1 files (any save converts, so this just saves + announces).
+    function updateVersionBadge(root) {
+        var badge = $(root, 'prog-version');
+        var btn = $(root, 'prog-migrate');
+        var v = S.data ? S.version : 0;
+        if (badge) badge.textContent = v === 2 ? 'v2' : v === 1 ? 'v1 — old format' : '';
+        if (btn) btn.hidden = v !== 1;
+    }
 
     var TEMPLATE_DEFAULTS = {
         colour: '#DB7700', rotation_speed: 3, px_width: 240, px_height: 40
@@ -254,6 +268,7 @@
         if (!list) return;
         if (!S.data) {
             list.innerHTML = '<p class="muted">No programs yet - create one above.</p>';
+            updateVersionBadge(root);
             return;
         }
         var services = S.data.services || {};
@@ -318,6 +333,7 @@
         if (!html) html = '<p class="muted">No destinations yet.</p>';
         list.innerHTML = html;
         suggestCode(root);
+        updateVersionBadge(root);
     }
 
     function fillProgramSelect(root, names) {
@@ -344,6 +360,7 @@
         if (raw) {
             try {
                 S.data = JSON.parse(raw);
+                S.version = progVersion(S.data);
                 S.dirty = true;
                 render(root);
                 fillDefaults(root);
@@ -359,6 +376,7 @@
             })
             .then(function (data) {
                 S.data = data;
+                S.version = progVersion(data);
                 S.dirty = false;
                 render(root);
                 fillDefaults(root);
@@ -385,11 +403,19 @@
             .then(function () {
                 S.dirty = false;
                 S.lastSaved = Date.now();
+                // The server stores v2 on every save, whatever we sent.
+                S.version = 2;
                 storeDel(draftKey(S.name));
-                try {
-                    setStatus(root, 'Saved ' + new Date(S.lastSaved).toLocaleTimeString());
-                } catch (err) {
-                    setStatus(root, 'Saved');
+                render(root);
+                if (S.migratePending) {
+                    S.migratePending = false;
+                    setStatus(root, 'Migrated ' + S.name + ' to v2');
+                } else {
+                    try {
+                        setStatus(root, 'Saved ' + new Date(S.lastSaved).toLocaleTimeString());
+                    } catch (err) {
+                        setStatus(root, 'Saved');
+                    }
                 }
             })
             .catch(function (err) {
@@ -537,6 +563,78 @@
             .catch(function (err) {
                 console.error(err);
                 setStatus(root, 'Could not delete program');
+            });
+    }
+
+    // Convert the open program to v2: just save it (the server stores
+    // v2 on every write) and announce the migration on success.
+    function migrateProgram(root) {
+        if (!S.name || !S.data) return;
+        if (S.version === 2) {
+            setStatus(root, 'Already v2');
+            return;
+        }
+        if (!window.confirm('Convert program ' + S.name + ' to the v2 format?' +
+                (S.dirty ? ' This also saves your unsaved changes.' : ''))) return;
+        S.migratePending = true;
+        doSave(root);
+    }
+
+    // Convert every v1 program file to v2: fetch each file fresh from the
+    // server and write it straight back (untouched content, new format).
+    // Browser drafts are left alone - they convert on their next save.
+    function migrateAll(root) {
+        setStatus(root, 'Checking programs…');
+        fetch('/api/programs')
+            .then(function (response) {
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                return response.json();
+            })
+            .then(function (names) {
+                var queue = names.slice();
+                var migrated = 0;
+                var checked = 0;
+                function next() {
+                    if (!queue.length) {
+                        setStatus(root, migrated
+                            ? 'Migrated ' + migrated + ' program' + (migrated === 1 ? '' : 's') + ' to v2'
+                            : 'All programs are already v2');
+                        return;
+                    }
+                    var n = queue.shift();
+                    checked++;
+                    setStatus(root, 'Checking ' + n + '… (' + checked + '/' + names.length + ')');
+                    fetchProgramFile(n).then(function (prog) {
+                        if (progVersion(prog) === 2) {
+                            next();
+                            return null;
+                        }
+                        return putProgramFile(n, prog).then(function () {
+                            migrated++;
+                            if (n === S.name && S.data) {
+                                // Converted under our working copy: stamp it
+                                // so the badge is honest (edits still pending
+                                // as before, they save as v2 next time).
+                                if (!S.data.defaults || typeof S.data.defaults !== 'object') {
+                                    S.data.defaults = {};
+                                }
+                                S.data.defaults.version = 2;
+                                S.version = 2;
+                                persist(root);
+                                render(root);
+                            }
+                            next();
+                        });
+                    }).catch(function (err) {
+                        console.error(err);
+                        next(); // skip failures, keep going
+                    });
+                }
+                next();
+            })
+            .catch(function (err) {
+                console.error(err);
+                setStatus(root, 'Could not list programs');
             });
     }
 
@@ -756,6 +854,8 @@
         if (!btn || !root.contains(btn)) return;
         var action = btn.dataset.action;
         if (action === 'save') doSave(root);
+        else if (action === 'migrate') migrateProgram(root);
+        else if (action === 'migrate-all') migrateAll(root);
         else if (action === 'add-program') addProgram(root);
         else if (action === 'add-page') addPage(root, btn.dataset.service, btn.dataset.destination);
         else if (action === 'add-destination') addDestination(root);

@@ -230,6 +230,13 @@
     padding-bottom: 0.6rem;
 }
 
+.prog-version {
+    flex-shrink: 0;
+    color: var(--muted, #a7a7b3);
+    font-size: 0.8rem;
+    padding-bottom: 0.6rem;
+}
+
 .new-program {
     display: flex;
     gap: 0.6rem;

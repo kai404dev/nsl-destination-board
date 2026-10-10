@@ -7,7 +7,9 @@
                 </select>
             </label>
             <button id="prog-save" class="btn-primary" type="button" data-action="save">Save</button>
+            <button id="prog-migrate" class="btn-primary" type="button" data-action="migrate" hidden>Migrate to v2</button>
             <button id="prog-delete" class="btn-danger" type="button" data-action="delete-program">Delete</button>
+            <span class="prog-version" id="prog-version"></span>
             <span class="prog-status" id="prog-status"></span>
         </div>
         <div class="new-program">
@@ -16,6 +18,7 @@
         </div>
         <div class="prog-transfer">
             <button type="button" data-action="export">Export</button>
+            <button type="button" data-action="migrate-all" title="Convert every v1 program file to the v2 format">Migrate all to v2</button>
             <input type="file" id="import-file" accept=".dest,application/json">
         </div>
         <div class="prog-defaults">

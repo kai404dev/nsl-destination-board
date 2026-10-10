@@ -110,8 +110,11 @@ defaults:
   live and the Program tab badges scrolling destinations.
 
 The portal API always serves expanded v1 and compacts back to v2 on
-every save, so the board, Studio and hand-written v1 files keep working
-— just open and Save a v1 program to convert it.
+every save, so the board, Studio and hand-written v1 files keep working.
+To convert old files, open one and press **Migrate to v2** (it appears
+next to Save for v1 programs), or convert everything at once with
+**Migrate all to v2** next to Export — both re-save the files
+untouched apart from the new format.
 
 Scrolling pages play inside their normal rotation slot: the board holds
 the start position ~0.8s, slides the text left, holds the end ~0.8s,
