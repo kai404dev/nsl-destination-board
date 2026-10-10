@@ -288,9 +288,20 @@
 }
 
 .service-key {
-    margin: 1rem 0 0.25rem;
+    margin: 0;
     font-size: 0.85rem;
     color: var(--muted, #a7a7b3);
+}
+
+.service-group-head {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin: 1rem 0 0.25rem;
+}
+
+.service-group-head .danger-ghost {
+    margin-left: auto;
 }
 
 .service {
@@ -389,6 +400,29 @@
 
 .page-chip [data-action="delete-page"] {
     color: var(--danger, #e5484d);
+}
+
+.danger-ghost {
+    flex-shrink: 0;
+    padding: 0.25rem 0.6rem;
+    background: transparent;
+    color: var(--danger, #e5484d);
+    border: 1px solid var(--border, #2c2c33);
+    border-radius: 8px;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.danger-ghost:hover {
+    background: rgba(229, 72, 77, 0.12);
+    border-color: var(--danger, #e5484d);
+}
+
+.service-head .danger-ghost {
+    margin-left: auto;
 }
 
 .paste-btn {

@@ -247,13 +247,17 @@
         var services = S.data.services || {};
         var html = '';
         sortedKeys(services).forEach(function (service) {
-            html += '<h3 class="service-key">Service ' + esc(service) + '</h3>';
+            html += '<div class="service-group-head"><h3 class="service-key">Service ' + esc(service) + '</h3>' +
+                '<button type="button" class="danger-ghost" data-action="delete-service" data-service="' + esc(service) +
+                '" aria-label="Delete service ' + esc(service) + '">Delete service</button></div>';
             sortedDestinations(services, service).forEach(function (name) {
                 var destination = services[service][name] || {};
                 html += '<div class="service"><div class="service-head"><strong>' + esc(name) + '</strong>' +
                     '<input type="text" class="code-edit" data-service="' + esc(service) +
                     '" data-destination="' + esc(name) + '" value="' + esc(destination.service_code || '') +
-                    '" maxlength="12" spellcheck="false" aria-label="Service code for ' + esc(name) + '">';
+                    '" maxlength="12" spellcheck="false" aria-label="Service code for ' + esc(name) + '">' +
+                    '<button type="button" class="danger-ghost" data-action="delete-destination" data-service="' + esc(service) +
+                    '" data-destination="' + esc(name) + '" aria-label="Delete destination ' + esc(name) + '">Delete</button>';
                 if (clipboard) {
                     html += '<button type="button" class="paste-btn" data-action="paste-page" data-service="' + esc(service) +
                         '" data-destination="' + esc(name) + '">Paste here</button>';
@@ -612,6 +616,28 @@
         render(root);
     }
 
+    function deleteDestination(root, service, destinationName) {
+        var group = S.data && S.data.services && S.data.services[service];
+        if (!group || !group[destinationName]) return;
+        if (!window.confirm('Delete destination ' + destinationName + ' (service ' + service + ')?')) return;
+        delete group[destinationName];
+        if (Object.keys(group).length === 0) {
+            delete S.data.services[service];
+        }
+        persist(root);
+        render(root);
+    }
+
+    function deleteService(root, service) {
+        var group = S.data && S.data.services && S.data.services[service];
+        if (!group) return;
+        var n = Object.keys(group).length;
+        if (!window.confirm('Delete service ' + service + ' with ' + n + ' destination' + (n === 1 ? '' : 's') + '?')) return;
+        delete S.data.services[service];
+        persist(root);
+        render(root);
+    }
+
     // Reorder rotation: keys ("0:", "1:", ...) define display order, so
     // shifting swaps the two pages' contents, keeping keys stable.
     function shiftPage(root, service, destinationName, pageKey, dir) {
@@ -717,6 +743,8 @@
         else if (action === 'add-page') addPage(root, btn.dataset.service, btn.dataset.destination);
         else if (action === 'add-destination') addDestination(root);
         else if (action === 'delete-page') deletePage(root, btn.dataset.service, btn.dataset.destination, btn.dataset.page);
+        else if (action === 'delete-destination') deleteDestination(root, btn.dataset.service, btn.dataset.destination);
+        else if (action === 'delete-service') deleteService(root, btn.dataset.service);
         else if (action === 'shift-left') shiftPage(root, btn.dataset.service, btn.dataset.destination, btn.dataset.page, -1);
         else if (action === 'shift-right') shiftPage(root, btn.dataset.service, btn.dataset.destination, btn.dataset.page, 1);
         else if (action === 'delete-program') deleteProgram(root);
