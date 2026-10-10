@@ -692,7 +692,7 @@ def splash_pages() -> list[dict]:
                        "align": "center", "valign": "middle"},
             "destination": {"text": "Displays", "font": "default-7x13B",
                             "colour": white,
-                            "from_X": 87, "to_X": 327, "front_Y": 24,
+                            "from_X": 92, "to_X": 332, "front_Y": 24,
                             "to_Y": 64, "align": "center", "valign": "middle"},
             "via": {"text": "", "font": "johnston100-18", "colour": amber,
                     "from_X": 0, "to_X": 180, "front_Y": 25, "to_Y": 40,
