@@ -698,7 +698,7 @@ def splash_pages() -> list[dict]:
                     "from_X": 0, "to_X": 180, "front_Y": 25, "to_Y": 40,
                     "align": "center", "valign": "middle"},
             "images": [{"src": "bitmaps/shared/Next_Stop_Labs_Full_Logo.png",
-                        "x": 0, "y": 0, "w": 200, "h": 35}],
+                        "x": 15, "y": 10, "w": 200, "h": 35}],
         },
     ]
 
