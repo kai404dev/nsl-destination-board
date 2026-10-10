@@ -674,11 +674,11 @@ def _play_scrolling(matrix, page: dict, W: int, H: int,
     return False
 
 
-SPLASH_PAGE_SECONDS = 5.0  # dwell per boot splash page (2 pages = 10s)
+SPLASH_PAGE_SECONDS = 10.0  # dwell per boot splash page (1 page = 10s)
 
 
 def splash_pages() -> list[dict]:
-    """Built-in startup pages (moved out of defualt.dest's startup/start).
+    """Built-in startup page (moved out of defualt.dest's startup/start).
 
     Canonical v1 element keys, rendered with the normal text renderer at
     240x40 so the splash matches what the file version showed.
@@ -699,19 +699,6 @@ def splash_pages() -> list[dict]:
                     "align": "center", "valign": "middle"},
             "images": [{"src": "bitmaps/shared/Next_Stop_Labs_Full_Logo.png",
                         "x": 0, "y": 0, "w": 200, "h": 35}],
-        },
-        {
-            "number": {"text": "Starting please wait", "font": "johnston100-26",
-                       "colour": white,
-                       "from_X": 0, "to_X": 240, "front_Y": 0, "to_Y": 40,
-                       "align": "center", "valign": "middle"},
-            "destination": {"text": "", "font": "default-7x13B",
-                            "colour": white,
-                            "from_X": 48, "to_X": 288, "front_Y": 13,
-                            "to_Y": 53, "align": "center", "valign": "middle"},
-            "via": {"text": "", "font": "johnston100-18", "colour": amber,
-                    "from_X": 0, "to_X": 180, "front_Y": 25, "to_Y": 40,
-                    "align": "center", "valign": "middle"},
         },
     ]
 
