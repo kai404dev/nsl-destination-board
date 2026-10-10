@@ -543,6 +543,7 @@ PROGRAM_TEMPLATE = {
         "rotation_speed": 3,
         "px_width": 240,
         "px_height": 40,
+        "scroll_speed": 30,
         "version": 2,
     },
     "services": {},

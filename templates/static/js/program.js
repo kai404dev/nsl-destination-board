@@ -135,7 +135,8 @@
     }
 
     var TEMPLATE_DEFAULTS = {
-        colour: '#DB7700', rotation_speed: 3, px_width: 240, px_height: 40
+        colour: '#DB7700', rotation_speed: 3, px_width: 240, px_height: 40,
+        scroll_speed: 30
     };
 
     // Older .dest files may lack `defaults` - merge the template in so the
@@ -167,6 +168,7 @@
         setVal(root, 'prog-def-speed', d.rotation_speed);
         setVal(root, 'prog-def-width', d.px_width);
         setVal(root, 'prog-def-height', d.px_height);
+        setVal(root, 'prog-def-scroll', d.scroll_speed);
     }
 
     function numOr(v, fallback) {
@@ -187,6 +189,8 @@
             d.px_width = Math.max(1, Math.round(numOr(t.value, TEMPLATE_DEFAULTS.px_width)));
         } else if (t.id === 'prog-def-height') {
             d.px_height = Math.max(1, Math.round(numOr(t.value, TEMPLATE_DEFAULTS.px_height)));
+        } else if (t.id === 'prog-def-scroll') {
+            d.scroll_speed = Math.max(1, Math.min(240, Math.round(numOr(t.value, TEMPLATE_DEFAULTS.scroll_speed))));
         }
         persist(root);
     }

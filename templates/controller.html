@@ -334,6 +334,11 @@
                     if (s.preview) {
                         nowEl.textContent += ' — live editor preview on screen (pauses this).';
                     }
+                    if (s.scrolling) {
+                        nowEl.textContent += ' — scrolling text on ' + s.scrolling +
+                            ' page' + (s.scrolling === 1 ? '' : 's') +
+                            ' at ' + (s.scroll_speed || 30) + ' px/s.';
+                    }
                     infoEl.textContent = '';
                     // Preselect dropdowns to the live selection.
                     if (sel.program && progEl.querySelector('option[value="' + CSS.escape(sel.program) + '"]')) {

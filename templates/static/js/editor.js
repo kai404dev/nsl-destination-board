@@ -551,7 +551,8 @@
     var scrollTimer = null;
     var scrollWidths = {}; // key -> { sig, width }
     var SCROLL_HOLD_TICKS = 6;
-    var SCROLL_PX_PER_TICK = 2;
+    // Preview pace ≈ the board default of 30px/s (3.6px per 120ms tick).
+    var SCROLL_PX_PER_TICK = 3.6;
 
     function stopScrollLoop() {
         if (scrollTimer) {

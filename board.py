@@ -541,6 +541,17 @@ def rotation_speed(program: dict) -> float:
         return 3.0
 
 
+DEFAULT_SCROLL_PX_PER_SEC = 30.0
+
+
+def scroll_speed(program: dict) -> float:
+    """Marquee pace in px/s (program ``defaults.scroll_speed``, 30)."""
+    try:
+        return max(1.0, float((program.get("defaults") or {}).get("scroll_speed", DEFAULT_SCROLL_PX_PER_SEC)))
+    except (TypeError, ValueError):
+        return DEFAULT_SCROLL_PX_PER_SEC
+
+
 # ---------------------------------------------------------------------------
 # Matrix options / player loop
 # ---------------------------------------------------------------------------
@@ -630,11 +641,12 @@ def _wait_while_selected(seconds: float, sel: dict, previewing: bool = False) ->
 
 def _play_scrolling(matrix, page: dict, W: int, H: int,
                    phys_w: int, phys_h: int, scrolls: dict,
-                   seconds: float, sel: dict) -> bool:
-    """Animate one scrolling text page for ~*seconds* on the matrix.
+                   px_per_sec: float, sel: dict) -> bool:
+    """Animate one scrolling text page on the matrix.
 
     Holds the start position, slides every scrolling element left in sync
-    (each travels its own overflow distance), holds the end position, then
+    at *px_per_sec* (each travels its own overflow distance, so the page
+    lasts holds + longest distance / pace), holds the end position, then
     returns False. Returns True when a new selection or preview cut in
     (the caller should re-resolve instead of advancing).
     """
@@ -646,8 +658,9 @@ def _play_scrolling(matrix, page: dict, W: int, H: int,
             img = img.resize((phys_w, phys_h), Image.NEAREST)
         matrix.SetImage(img.convert("RGB"))
 
-    hold = min(SCROLL_HOLD_SECONDS, max(0.0, seconds / 4))
-    steps = max(1, int(round(max(0.2, seconds - 2 * hold) / SCROLL_STEP_SECONDS)))
+    hold = SCROLL_HOLD_SECONDS
+    max_dist = max([v["distance"] for v in scrolls.values()] or [0])
+    steps = max(1, int(round(max_dist / max(1.0, px_per_sec) / SCROLL_STEP_SECONDS)))
     _show({})
     if _wait_while_selected(hold, sel):
         return True
@@ -680,6 +693,7 @@ def run_board(args) -> None:
     frames: list = []
     program: dict | None = None
     speed = 3.0
+    scroll_px = DEFAULT_SCROLL_PX_PER_SEC
     idx = 0
     while True:
         preview = api.get_preview()
@@ -723,9 +737,15 @@ def run_board(args) -> None:
                 frames = destination_frames(
                     program, sel.get("service") or "", sel.get("destination") or "")
                 speed = rotation_speed(program)
+                scroll_px = scroll_speed(program)
+                W0 = args.panel_width or int(((program.get("defaults") or {}).get("px_width", 240)) or 240)
+                H0 = int(((program.get("defaults") or {}).get("px_height", 40)) or 40)
+                n_scroll = sum(1 for _kind, _pay in frames
+                               if _kind == "text" and page_scrolls(_pay, W0, H0))
                 print(f"Board: playing {sel.get('program')} / "
                       f"{sel.get('service')} / {sel.get('destination')} "
-                      f"({len(frames)} frames, {speed}s)")
+                      f"({len(frames)} frames, {speed}s"
+                      f"{f', {n_scroll} scrolling @{scroll_px:g}px/s' if n_scroll else ''})")
                 # Transition wipe: clear the old screen for a beat so it
                 # never blends into the new destination.
                 print(f"Board: clearing screen for {WIPE_SECONDS:g}s")
@@ -748,6 +768,7 @@ def run_board(args) -> None:
                 frames = destination_frames(
                     program, sel.get("service") or "", sel.get("destination") or "")
                 speed = rotation_speed(program)
+                scroll_px = scroll_speed(program)
             idx = 0
             if not frames:
                 continue
@@ -762,9 +783,9 @@ def run_board(args) -> None:
                 scrolls = page_scrolls(payload, W, H)
                 if scrolls:
                     if _play_scrolling(matrix, payload, W, H,
-                                       phys_w, phys_h, scrolls, speed, sel):
+                                       phys_w, phys_h, scrolls, scroll_px, sel):
                         continue  # cut in: re-resolve, don't advance
-                    scrolled = True  # slot time already spent scrolling
+                    scrolled = True  # scroll time already spent
                 else:
                     img = render_text_page(payload, W, H)
                     if img.size != (phys_w, phys_h):

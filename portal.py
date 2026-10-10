@@ -63,14 +63,14 @@ def _board_state_payload() -> dict:
     program = api.load_program(PROGRAMS_DIR, sel.get("program") or "")
     if program is None:
         return {"selection": sel, "valid": False, "pages": 0,
-                "rotation_speed": 3,
+                "rotation_speed": 3, "scrolling": 0,
                 "services": [], "destinations": [],
                 "preview": api.get_preview() is not None}
     services = api.list_services(program)
     destinations = api.list_destinations(program, sel.get("service") or "")
     if sel.get("service") not in services or sel.get("destination") not in destinations:
         return {"selection": sel, "valid": False, "pages": 0,
-                "rotation_speed": 3, "services": services,
+                "rotation_speed": 3, "scrolling": 0, "services": services,
                 "destinations": destinations,
                 "preview": api.get_preview() is not None}
     dest = ((program.get("services") or {}).get(sel.get("service") or "")
@@ -87,8 +87,28 @@ def _board_state_payload() -> dict:
         speed = float((program.get("defaults") or {}).get("rotation_speed", 3))
     except (TypeError, ValueError):
         speed = 3
+    try:
+        scroll_px = max(1.0, float((program.get("defaults") or {}).get("scroll_speed", 30)))
+    except (TypeError, ValueError):
+        scroll_px = 30.0
+    # Scrolling pages on this destination (same measurement the player
+    # uses) - lets the Controller show whether the board will scroll.
+    scrolling = 0
+    try:
+        import board as _board
+
+        _W = int(((program.get("defaults") or {}).get("px_width", 240)) or 240)
+        _H = int(((program.get("defaults") or {}).get("px_height", 40)) or 40)
+        if isinstance(dest, dict) and isinstance(dest.get("text"), dict):
+            for _page in dest["text"].values():
+                if isinstance(_page, dict) and _board.page_scrolls(_page, _W, _H):
+                    scrolling += 1
+    except Exception:
+        scrolling = 0
     return {"selection": sel, "valid": True, "pages": pages,
-            "rotation_speed": speed, "services": services,
+            "rotation_speed": speed, "scrolling": scrolling,
+            "scroll_speed": scroll_px,
+            "services": services,
             "destinations": destinations,
             "preview": api.get_preview() is not None}
 

@@ -116,11 +116,17 @@ next to Save for v1 programs), or convert everything at once with
 **Migrate all to v2** next to Export — both re-save the files
 untouched apart from the new format.
 
-Scrolling pages play inside their normal rotation slot: the board holds
-the start position ~0.8s, slides the text left, holds the end ~0.8s,
-then moves to the next page (shorter slots scroll faster to fit).
+Scrolling pages play at the program's **Scroll (px/s)** pace (Defaults,
+30): the board holds the start position ~0.8s, slides the text left,
+holds the end ~0.8s, then moves to the next page — so a scrolling page
+lasts holds + distance / pace rather than the rotation slot.
 Switching destinations or starting an editor preview cuts in
-immediately, like any other page change.
+immediately, like any other page change. The scroll only reaches the
+board once the page is written back (Editor → Save tab → Update page in
+program → Program tab Save) and the Pi runs this code (`git pull` +
+`sudo systemctl restart board.service`); the Controller's Now playing
+line confirms it (`scrolling text on N pages`), as does
+`journalctl -u board.service -f` (`playing … (N frames, Ss, M scrolling)`).
 
 ### Choosing what plays (Controller tab)
 
