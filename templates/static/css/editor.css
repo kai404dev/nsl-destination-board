@@ -311,35 +311,6 @@
     margin-left: auto;
 }
 
-.service {
-    padding: 0.5rem 0;
-    border-top: 1px solid var(--border, #2c2c33);
-}
-
-.service-head {
-    display: flex;
-    align-items: baseline;
-    gap: 0.5rem;
-}
-
-.service-head .code {
-    color: var(--muted, #a7a7b3);
-    font-size: 0.85rem;
-}
-
-/* Editable service code: compact single-line input in the heading row. */
-.service-head .code-edit {
-    width: 5em;
-    min-height: 0;
-    padding: 0.2rem 0.4rem;
-    font-size: 0.85rem;
-}
-
-.service-head .code-edit:focus {
-    outline: none;
-    border-color: var(--accent, #DB7700);
-}
-
 .page-list {
     display: flex;
     flex-wrap: wrap;
@@ -349,6 +320,107 @@
 
 .page-list[hidden] {
     display: none;
+}
+
+.service-dests {
+    overflow-x: auto;
+}
+
+.service-dests[hidden] {
+    display: none;
+}
+
+/* Destination table: one calm row per destination, pages unfold below. */
+.dest-table {
+    width: 100%;
+    min-width: 540px;
+    border-collapse: collapse;
+    margin: 0.25rem 0 1rem;
+    font-size: 0.95rem;
+}
+
+.dest-table thead th {
+    text-align: left;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--muted, #a7a7b3);
+    padding: 0.3rem 0.6rem;
+    border-bottom: 1px solid var(--border, #2c2c33);
+    white-space: nowrap;
+}
+
+.dest-table td {
+    padding: 0.4rem 0.6rem;
+    border-bottom: 1px solid var(--border, #2c2c33);
+    vertical-align: middle;
+}
+
+.dest-table tbody tr.dest-row:hover td {
+    background: rgba(255, 255, 255, 0.025);
+}
+
+.dest-table .col-toggle {
+    width: 2.6rem;
+}
+
+.dest-table .col-name strong {
+    font-size: 1rem;
+}
+
+.dest-table .col-code {
+    width: 6.5rem;
+}
+
+.dest-table .col-pages {
+    white-space: nowrap;
+    font-size: 0.85rem;
+}
+
+.dest-table .col-actions {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.dest-table .col-actions button + button {
+    margin-left: 0.4rem;
+}
+
+/* Editable service code: compact single-line input in its column. */
+.dest-table .code-edit {
+    width: 5em;
+    min-height: 0;
+    padding: 0.2rem 0.4rem;
+    font-size: 0.85rem;
+}
+
+.dest-table .code-edit:focus {
+    outline: none;
+    border-color: var(--accent, #DB7700);
+}
+
+.dest-table .scroll-badge {
+    margin-left: 0.5rem;
+}
+
+/* Expanded pages live in a full-width row under their destination. */
+tr.dest-pages[hidden] {
+    display: none;
+}
+
+tr.dest-pages td {
+    padding: 0 0.6rem 0.75rem 3.2rem;
+    border-bottom: 1px solid var(--border, #2c2c33);
+}
+
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
 }
 
 /* Destination collapse: list bar + chevron toggles keep big programs
@@ -400,6 +472,25 @@
 .dest-toggle:hover {
     border-color: var(--accent, #DB7700);
     color: var(--accent, #DB7700);
+}
+
+/* Small ghost buttons in service/destination headers (Rename). */
+.mini-btn {
+    flex-shrink: 0;
+    padding: 0.25rem 0.6rem;
+    background: transparent;
+    color: var(--text, #f2f2f4);
+    border: 1px solid var(--border, #2c2c33);
+    border-radius: 8px;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.mini-btn:hover {
+    border-color: var(--accent, #DB7700);
 }
 
 .page-list button {
@@ -483,11 +574,7 @@
     border-color: var(--danger, #e5484d);
 }
 
-.service-head .danger-ghost {
-    margin-left: auto;
-}
-
-.service-head .scroll-badge {
+.scroll-badge {
     flex-shrink: 0;
     font-size: 0.72rem;
     font-weight: 700;
@@ -497,6 +584,7 @@
     border-radius: 20px;
     padding: 0.1rem 0.5rem;
     white-space: nowrap;
+    vertical-align: middle;
 }
 
 .paste-btn {

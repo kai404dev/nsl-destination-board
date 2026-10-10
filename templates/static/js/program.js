@@ -215,6 +215,40 @@
         } catch (err) { /* ignore */ }
     }
 
+    // Service collapse state: mirrors the destination one, keyed by
+    // program + service. SEP avoids collisions with names containing
+    // spaces (built without an escape literal so it survives editing).
+    var SEP = String.fromCharCode(0);
+    var SVC_EXP_KEY = 'nsl.programSvcExpanded.v1';
+    var svcExpanded = {};
+    try {
+        var _savedSvc = JSON.parse(storeGet(SVC_EXP_KEY));
+        if (_savedSvc && typeof _savedSvc === 'object') svcExpanded = _savedSvc;
+    } catch (err) { /* ignore */ }
+
+    function saveSvcExpanded() {
+        try {
+            if (Object.keys(svcExpanded).length > 1000) svcExpanded = {};
+            storeSet(SVC_EXP_KEY, JSON.stringify(svcExpanded));
+        } catch (err) { /* ignore */ }
+    }
+
+    function svcKey(service) {
+        return S.name + SEP + service;
+    }
+
+    function setSvcExpanded(service, on) {
+        var k = svcKey(service);
+        if (on) svcExpanded[k] = true;
+        else delete svcExpanded[k];
+        saveSvcExpanded();
+    }
+
+    function dropSvcExpanded(service) {
+        delete svcExpanded[svcKey(service)];
+        saveSvcExpanded();
+    }
+
     function expKey(service, destinationName) {
         return S.name + '\0' + service + '\0' + destinationName;
     }
@@ -326,32 +360,52 @@
                 '<button type="button" data-action="collapse-all">Collapse all</button></div>';
         }
         sortedKeys(services).forEach(function (service) {
-            html += '<div class="service-group-head"><h3 class="service-key">Service ' + esc(service) + '</h3>' +
+            var svcExp = !!svcExpanded[svcKey(service)];
+            html += '<div class="service-group-head"><button type="button" class="dest-toggle" data-action="toggle-service" data-service="' + esc(service) +
+                '" aria-expanded="' + (svcExp ? 'true' : 'false') +
+                '" aria-label="' + (svcExp ? 'Collapse service ' : 'Expand service ') + esc(service) + '">' +
+                (svcExp ? '▾' : '▸') + '</button>' +
+                '<h3 class="service-key">Service ' + esc(service) + '</h3>' +
+                '<button type="button" class="mini-btn" data-action="rename-service" data-service="' + esc(service) +
+                '" aria-label="Rename service ' + esc(service) + '">Rename</button>' +
                 '<button type="button" class="danger-ghost" data-action="delete-service" data-service="' + esc(service) +
                 '" aria-label="Delete service ' + esc(service) + '">Delete service</button></div>';
+            html += '<div class="service-dests"' + (svcExp ? '' : ' hidden') + '>';
+            html += '<table class="dest-table"><thead><tr>' +
+                '<th class="col-toggle" scope="col"><span class="visually-hidden">Expand</span></th>' +
+                '<th scope="col">Destination</th><th scope="col">Code</th><th scope="col">Pages</th>' +
+                '<th class="col-actions" scope="col"><span class="visually-hidden">Actions</span></th>' +
+                '</tr></thead><tbody>';
             sortedDestinations(services, service).forEach(function (name) {
                 var destination = services[service][name] || {};
                 var isExp = !!expanded[expKey(service, name)];
-                html += '<div class="service"><div class="service-head">' +
-                    '<button type="button" class="dest-toggle" data-action="toggle-destination" data-service="' + esc(service) +
+                var pages = servicePages(destination);
+                var pageCount = pages ? Object.keys(pages).length : 0;
+                html += '<tr class="dest-row">' +
+                    '<td class="col-toggle"><button type="button" class="dest-toggle" data-action="toggle-destination" data-service="' + esc(service) +
                     '" data-destination="' + esc(name) + '" aria-expanded="' + (isExp ? 'true' : 'false') +
                     '" aria-label="' + (isExp ? 'Collapse ' : 'Expand ') + esc(name) + '">' +
-                    (isExp ? '▾' : '▸') + '</button>' +
-                    '<strong>' + esc(name) + '</strong>' +
-                    '<input type="text" class="code-edit" data-service="' + esc(service) +
-                    '" data-destination="' + esc(name) + '" value="' + esc(destination.service_code || '') +
-                    '" maxlength="12" spellcheck="false" aria-label="Service code for ' + esc(name) + '">';
+                    (isExp ? '▾' : '▸') + '</button></td>' +
+                    '<td class="col-name"><strong>' + esc(name) + '</strong>';
                 if (destinationScrolls(destination)) {
-                    html += '<span class="scroll-badge" title="Destination or via text scrolls when too wide">scroll</span>';
+                    html += ' <span class="scroll-badge" title="Destination or via text scrolls when too wide">scroll</span>';
                 }
-                html += '<button type="button" class="danger-ghost" data-action="delete-destination" data-service="' + esc(service) +
-                    '" data-destination="' + esc(name) + '" aria-label="Delete destination ' + esc(name) + '">Delete</button>';
+                html += '</td>' +
+                    '<td class="col-code"><input type="text" class="code-edit" data-service="' + esc(service) +
+                    '" data-destination="' + esc(name) + '" value="' + esc(destination.service_code || '') +
+                    '" maxlength="12" spellcheck="false" aria-label="Service code for ' + esc(name) + '"></td>' +
+                    '<td class="col-pages muted">' + (pages ? pageCount + ' page' + (pageCount === 1 ? '' : 's') : 'Bitmap') + '</td>' +
+                    '<td class="col-actions">';
                 if (clipboard) {
                     html += '<button type="button" class="paste-btn" data-action="paste-page" data-service="' + esc(service) +
                         '" data-destination="' + esc(name) + '">Paste here</button>';
                 }
-                html += '</div><div class="page-list"' + (isExp ? '' : ' hidden') + '>';
-                var pages = servicePages(destination);
+                html += '<button type="button" class="mini-btn" data-action="rename-destination" data-service="' + esc(service) +
+                    '" data-destination="' + esc(name) + '" aria-label="Rename destination ' + esc(name) + '">Rename</button>' +
+                    '<button type="button" class="danger-ghost" data-action="delete-destination" data-service="' + esc(service) +
+                    '" data-destination="' + esc(name) + '" aria-label="Delete destination ' + esc(name) + '">Delete</button>' +
+                    '</td></tr>';
+                html += '<tr class="dest-pages"' + (isExp ? '' : ' hidden') + '><td colspan="5"><div class="page-list">';
                 if (pages) {
                     sortedKeys(pages).forEach(function (pageKey, idx, arr) {
                         var page = pages[pageKey] || {};
@@ -385,8 +439,10 @@
                     html += '<button type="button" class="ghost" data-action="add-page" data-service="' + esc(service) +
                         '" data-destination="' + esc(name) + '">+ Page</button>';
                 }
-                html += '</div></div>';
+                html += '</div></td></tr>';
             });
+            html += '</tbody></table>';
+            html += '</div>';
         });
         if (!html) html = '<p class="muted">No destinations yet.</p>';
         list.innerHTML = html;
@@ -745,6 +801,7 @@
         var mode = clipboard.mode;
         var from = clipboard.from;
         clipboard = null;
+        setSvcExpanded(service, true);
         setExpanded(service, destinationName, true);
         persist(root);
         render(root);
@@ -809,8 +866,78 @@
         if (!window.confirm('Delete service ' + service + ' with ' + n + ' destination' + (n === 1 ? '' : 's') + '?')) return;
         delete S.data.services[service];
         dropExpanded(service);
+        dropSvcExpanded(service);
         persist(root);
         render(root);
+    }
+
+    function renameDestination(root, service, destinationName) {
+        var group = S.data && S.data.services && S.data.services[service];
+        if (!group || !group[destinationName]) return;
+        var next = window.prompt('Rename destination ' + destinationName + ' to:', destinationName);
+        if (next === null) return;
+        next = (next || '').trim();
+        if (!next) {
+            setStatus(root, 'Name cannot be empty');
+            return;
+        }
+        if (next === destinationName) return;
+        if (group[next]) {
+            setStatus(root, 'Destination already exists');
+            return;
+        }
+        var dest = group[destinationName];
+        delete group[destinationName];
+        group[next] = dest;
+        if (!dest.service_name || dest.service_name === destinationName) dest.service_name = next;
+        if (clipboard && clipboard.from.program === S.name &&
+            clipboard.from.service === service && clipboard.from.destination === destinationName) {
+            clipboard.from.destination = next;
+        }
+        var wasExp = !!expanded[expKey(service, destinationName)];
+        dropExpanded(service, destinationName);
+        setExpanded(service, next, wasExp);
+        persist(root);
+        render(root);
+        // Save straight through like add/delete: the key is the identity.
+        doSave(root);
+    }
+
+    function renameService(root, service) {
+        var services = S.data && S.data.services;
+        if (!services || !services[service]) return;
+        var next = window.prompt('Rename service ' + service + ' to:', service);
+        if (next === null) return;
+        next = (next || '').trim();
+        if (!next) {
+            setStatus(root, 'Name cannot be empty');
+            return;
+        }
+        if (next === service) return;
+        if (services[next]) {
+            setStatus(root, 'Service already exists');
+            return;
+        }
+        services[next] = services[service];
+        delete services[service];
+        if (clipboard && clipboard.from.program === S.name && clipboard.from.service === service) {
+            clipboard.from.service = next;
+        }
+        var svcWasExp = !!svcExpanded[svcKey(service)];
+        dropSvcExpanded(service);
+        setSvcExpanded(next, svcWasExp);
+        var oldPrefix = S.name + '\0' + service + '\0';
+        var newPrefix = S.name + '\0' + next + '\0';
+        Object.keys(expanded).forEach(function (k) {
+            if (k.indexOf(oldPrefix) === 0) {
+                expanded[newPrefix + k.slice(oldPrefix.length)] = true;
+                delete expanded[k];
+            }
+        });
+        saveExpanded();
+        persist(root);
+        render(root);
+        doSave(root);
     }
 
     // Reorder rotation: keys ("0:", "1:", ...) define display order, so
@@ -838,6 +965,7 @@
         if (!S.data || !name) return;
         var service = (serviceEl && serviceEl.value.trim()) || sortedKeys(S.data.services || {})[0] || '1';
         if (!S.data.services) S.data.services = {};
+        var isNewService = !S.data.services[service];
         if (!S.data.services[service]) S.data.services[service] = {};
         if (S.data.services[service][name]) {
             setStatus(root, 'Destination already exists');
@@ -850,6 +978,7 @@
         };
         if (nameEl) nameEl.value = '';
         if (codeEl) codeEl.value = '';
+        if (isNewService) setSvcExpanded(service, true);
         setExpanded(service, name, true);
         persist(root);
         render(root);
@@ -924,13 +1053,20 @@
         else if (action === 'delete-page') deletePage(root, btn.dataset.service, btn.dataset.destination, btn.dataset.page);
         else if (action === 'delete-destination') deleteDestination(root, btn.dataset.service, btn.dataset.destination);
         else if (action === 'delete-service') deleteService(root, btn.dataset.service);
+        else if (action === 'rename-destination') renameDestination(root, btn.dataset.service, btn.dataset.destination);
+        else if (action === 'rename-service') renameService(root, btn.dataset.service);
         else if (action === 'toggle-destination') {
             setExpanded(btn.dataset.service, btn.dataset.destination,
                 !expanded[expKey(btn.dataset.service, btn.dataset.destination)]);
             render(root);
         }
+        else if (action === 'toggle-service') {
+            setSvcExpanded(btn.dataset.service, !svcExpanded[svcKey(btn.dataset.service)]);
+            render(root);
+        }
         else if (action === 'expand-all') {
             Object.keys(S.data && S.data.services || {}).forEach(function (service) {
+                setSvcExpanded(service, true);
                 Object.keys(S.data.services[service] || {}).forEach(function (name) {
                     setExpanded(service, name, true);
                 });
@@ -939,6 +1075,7 @@
         }
         else if (action === 'collapse-all') {
             Object.keys(S.data && S.data.services || {}).forEach(function (service) {
+                setSvcExpanded(service, false);
                 Object.keys(S.data.services[service] || {}).forEach(function (name) {
                     setExpanded(service, name, false);
                 });
