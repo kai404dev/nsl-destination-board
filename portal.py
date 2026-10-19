@@ -30,6 +30,8 @@ Routes:
     /api/nextstop/services/<name>     -> GET/PUT/DELETE one .service file
     /api/nextstop/link                -> POST {program,service,destination,
                                        nextstop_service} ("" to unlink)
+    /api/nextstop/terminating         -> POST {program,service,destination,
+                                       terminating_screen} ({} to unlink)
     /api/audio                        -> GET list of premade announcement files
     /api/tts/voices                  -> GET Piper voices + engine status
     /api/tts/templates               -> GET/PUT global announcement
@@ -445,6 +447,24 @@ class BoardHandler(SimpleHTTPRequestHandler):
                 status = 409 if message == "service already exists" else 400
                 return self._serve_json({"error": message}, status=status)
             return self._serve_json({"ok": True, "name": (name or "").strip()}, status=201)
+
+        # Point a .dest destination at its terminating screen (or unlink).
+        # POST {program, service, destination, terminating_screen} where the
+        # screen is {program, service, destination} ({} / "" to unlink).
+        if url_path in ("/api/nextstop/terminating", "/api/nextstop/terminating/"):
+            data, error = self._read_json_body()
+            if error:
+                return self._serve_json({"error": error}, status=400)
+            if not isinstance(data, dict):
+                return self._serve_json({"error": "body must be JSON"}, status=400)
+            ok, message = api.set_destination_terminating(
+                PROGRAMS_DIR, str(data.get("program") or ""),
+                str(data.get("service") or ""),
+                str(data.get("destination") or ""),
+                data.get("terminating_screen"))
+            if not ok:
+                return self._serve_json({"error": message}, status=400)
+            return self._serve_json({"ok": True})
 
         # Link a .dest destination to a .service file ("" to unlink).
         if url_path in ("/api/nextstop/link", "/api/nextstop/link/"):

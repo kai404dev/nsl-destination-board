@@ -1512,6 +1512,71 @@ def set_destination_nextstop(programs_dir: Path, program_name: str,
     return save_program(_P(programs_dir), program_name, data)
 
 
+def get_destination_terminating(program: dict, service: str,
+                                destination: str) -> dict:
+    """Return a destination's terminating screen triple, or {} when none.
+
+    The triple is {"program", "service", "destination"} - what the board
+    switches to when this destination's route terminates (final arrival).
+    """
+    try:
+        dest = ((program.get("services") or {}).get(service) or {}).get(destination) or {}
+        raw = dest.get("terminating_screen") or {}
+        if not isinstance(raw, dict):
+            return {}
+        triple = {"program": str(raw.get("program") or ""),
+                  "service": str(raw.get("service") or ""),
+                  "destination": str(raw.get("destination") or "")}
+        return triple if all(triple.values()) else {}
+    except AttributeError:
+        return {}
+
+
+def set_destination_terminating(programs_dir: Path, program_name: str,
+                                service: str, destination: str,
+                                terminating) -> tuple[bool, str]:
+    """Point one .dest destination at its terminating screen ({} to unlink).
+
+    *terminating* is {"program", "service", "destination"} - each must
+    name a real program/service/destination, and the triple may not point
+    at the destination itself.
+    """
+    from pathlib import Path as _P
+
+    data = load_program(_P(programs_dir), program_name or "")
+    if data is None:
+        return False, "program not found"
+    group = (data.get("services") or {}).get(service)
+    if not isinstance(group, dict) or destination not in group:
+        return False, "destination not found"
+    dest = group.get(destination)
+    if not isinstance(dest, dict):
+        return False, "destination not found"
+    if not terminating:
+        dest.pop("terminating_screen", None)
+        return save_program(_P(programs_dir), program_name, data)
+    if not isinstance(terminating, dict):
+        return False, "terminating screen must be {program, service, destination}"
+    triple = {"program": str(terminating.get("program") or ""),
+              "service": str(terminating.get("service") or ""),
+              "destination": str(terminating.get("destination") or "")}
+    if not all(triple.values()):
+        return False, "terminating screen needs program, service and destination"
+    if (triple["program"] == (program_name or "")
+            and triple["service"] == service
+            and triple["destination"] == destination):
+        return False, "terminating screen cannot point at itself"
+    target = load_program(_P(programs_dir), triple["program"])
+    if target is None:
+        return False, "terminating program not found"
+    if triple["service"] not in list_services(target):
+        return False, "terminating service not found"
+    if triple["destination"] not in list_destinations(target, triple["service"]):
+        return False, "terminating destination not found"
+    dest["terminating_screen"] = triple
+    return save_program(_P(programs_dir), program_name, data)
+
+
 def list_audio_files(root: Path) -> list[dict]:
     """Return sorted [{path, bytes}] for every playable file under audio/.
     Generated Piper clips live under audio/tts/ (git-ignored cache)."""

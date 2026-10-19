@@ -14,6 +14,28 @@
         "bitmaps": [
           "bitmaps/programs/defualt/0/noroute-not-in-service.png"
         ]
+      },
+      "Terminates": {
+        "service_code": "001",
+        "text": {
+          "0:": {
+            "number": {
+              "text": "X1",
+              "font": "johnston100-45",
+              "area": [180, 0, 240, 40]
+            },
+            "destination": {
+              "text": "DO NOT BOARD",
+              "font": "johnston100-22",
+              "area": [0, 0, 180, 25]
+            },
+            "via": {
+              "text": "this bus terminates here",
+              "font": "default-7x13B",
+              "area": [0, 25, 180, 40]
+            }
+          }
+        }
       }
     },
     "1": {

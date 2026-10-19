@@ -57,6 +57,23 @@
                 <button id="ns-link" class="tbtn" type="button" title="Point this destination at the selected .service file">Link</button>
             </div>
             <p class="muted small" id="ns-linkstate"></p>
+            <label for="ns-term-program">Terminating screen (board switches here on final arrival)</label>
+            <div class="ns-row">
+                <div>
+                    <select id="ns-term-program"><option value="">–</option></select>
+                </div>
+                <div>
+                    <select id="ns-term-service"><option value="">–</option></select>
+                </div>
+                <div>
+                    <select id="ns-term-destination"><option value="">–</option></select>
+                </div>
+            </div>
+            <div class="ns-row">
+                <button id="ns-term-save" class="tbtn" type="button" title="Point this destination at the selected terminating screen">Set</button>
+                <button id="ns-term-clear" class="tbtn" type="button" title="Remove the terminating screen">Clear</button>
+            </div>
+            <p class="muted small" id="ns-termstate"></p>
             <div class="ns-row">
                 <button id="ns-start" class="btn-primary" type="button">Start route + board</button>
                 <button id="ns-stop" class="tbtn" type="button">Stop</button>

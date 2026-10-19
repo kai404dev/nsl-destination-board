@@ -7,6 +7,8 @@
     var $ = function (id) { return document.getElementById(id); };
     var progEl = $("ns-program"), servEl = $("ns-service"), destEl = $("ns-destination");
     var fileEl = $("ns-servicefile"), linkState = $("ns-linkstate");
+    var tProgEl = $("ns-term-program"), tServEl = $("ns-term-service"), tDestEl = $("ns-term-destination");
+    var termState = $("ns-termstate");
     var routeEl = $("ns-route"), destTitle = $("ns-dest"), timeEl = $("ns-time");
     var stopsEl = $("ns-stops"), footerEl = $("ns-footer"), clockEl = $("ns-clock");
     var editorEl = $("ns-editor"), saveState = $("ns-savestate");
@@ -337,8 +339,29 @@
             S.announcedHere[key] = true;
             if (manual) S.awaitPreview = true; // Next press previews what's next
             speakItems(arrivalItems(i), true);
+            if (i === S.stops.length - 1) switchToTerminating();
             footerEl.textContent = (manual ? "Testing stop " : "Arrived: ") + S.stops[i].name + (S.stops[i].sub ? " — " + S.stops[i].sub : "") + (i === S.stops.length - 1 ? " (last stop)." : ".");
         }
+    }
+
+    // Final arrival: switch the board to this destination's terminating
+    // screen (if one is configured) - same call Start uses, fire and forget.
+    function switchToTerminating() {
+        var t = currentTerminating();
+        if (!t) return;
+        fetch("/api/board/select", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(t) })
+            .then(function () { }).catch(function () { });
+    }
+    function currentTerminating() {
+        try {
+            var p = progCache[progEl.value];
+            var d = ((((p || {}).services || {})[servEl.value] || {})[destEl.value]) || {};
+            var t = d.terminating_screen || {};
+            if (t.program && t.service && t.destination) {
+                return { program: t.program, service: t.service, destination: t.destination };
+            }
+        } catch (e) { }
+        return null;
     }
 
     function announceNext(i) {
@@ -408,12 +431,75 @@
             return onDest();
         });
     }
-    function onDest() { refreshLinkState(); }
+    function onDest() { refreshLinkState(); refreshTermState(); }
+
+    /* ---------- terminating screen picker ---------- */
+    function termTriple() {
+        return { program: tProgEl.value || "", service: tServEl.value || "", destination: tDestEl.value || "" };
+    }
+    function onTermProgram() {
+        var n = tProgEl.value;
+        if (!n) { fill(tServEl, [], "–"); return onTermService(); }
+        return getProgram(n).then(function (p) {
+            fill(tServEl, serviceKeys(p));
+            return onTermService();
+        });
+    }
+    function onTermService() {
+        var n = tProgEl.value, s = tServEl.value;
+        if (!n || !s) { fill(tDestEl, [], "–"); return Promise.resolve(); }
+        return getProgram(n).then(function (p) {
+            fill(tDestEl, destNames(p, s));
+        });
+    }
+    function refreshTermState() {
+        var t = currentTerminating();
+        termState.textContent = t ? ("Terminating screen: " + t.program + " / " + t.service + " / " + t.destination + " (board switches here on final arrival).")
+            : "No terminating screen — board keeps looping this destination after the last stop.";
+        if (t) syncTermPicker(t);
+    }
+    // Show the saved triple in the picker (async cascade, program cached).
+    function syncTermPicker(t) {
+        if (tProgEl.value !== t.program) {
+            tProgEl.value = t.program;
+            onTermProgram().then(function () {
+                tServEl.value = t.service;
+                return onTermService();
+            }).then(function () { tDestEl.value = t.destination; });
+        } else if (tServEl.value !== t.service) {
+            tServEl.value = t.service;
+            onTermService().then(function () { tDestEl.value = t.destination; });
+        } else if (tDestEl.value !== t.destination) {
+            tDestEl.value = t.destination;
+        }
+    }
+    function saveTerminating(triple) {
+        var body = { program: progEl.value, service: servEl.value, destination: destEl.value, terminating_screen: triple };
+        if (!body.program || !body.service || !body.destination) { sayStatus("Pick program/service/destination first."); return; }
+        sayStatus("Saving…");
+        fetch("/api/nextstop/terminating", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+            .then(function (res) {
+                if (!res.ok) throw new Error(res.j.error || "failed");
+                delete progCache[progEl.value];
+                sayStatus(triple && triple.program ? "Terminating screen set." : "Terminating screen cleared.");
+                refreshTermState();
+            }).catch(function (e) { sayStatus("Save failed: " + e.message); });
+    }
 
     progEl.addEventListener("change", onProgram);
     servEl.addEventListener("change", onService);
     destEl.addEventListener("change", onDest);
     fileEl.addEventListener("change", function () { loadServiceFile(fileEl.value); });
+
+    tProgEl.addEventListener("change", onTermProgram);
+    tServEl.addEventListener("change", onTermService);
+    $("ns-term-save").addEventListener("click", function () {
+        var t = termTriple();
+        if (!t.program || !t.service || !t.destination) { sayStatus("Pick a terminating program/service/destination first."); return; }
+        saveTerminating(t);
+    });
+    $("ns-term-clear").addEventListener("click", function () { saveTerminating({}); });
 
     $("ns-link").addEventListener("click", function () {
         var body = { program: progEl.value, service: servEl.value, destination: destEl.value, nextstop_service: fileEl.value || "" };
@@ -693,19 +779,22 @@
     loadGlobalTemplates();
 
     fetch("/api/programs").then(function (r) { return r.json(); }).then(function (names) {
-        if (!names.length) { fill(progEl, [], "No programs"); return; }
+        if (!names.length) { fill(progEl, [], "No programs"); fill(tProgEl, [], "No programs"); return; }
         fill(progEl, names);
-        return fetch("/api/board/state").then(function (r) { return r.json(); }).then(function (s) {
-            var sel = s.selection || {};
-            if (sel.program && names.indexOf(sel.program) >= 0) progEl.value = sel.program;
-            return refreshFiles().then(onProgram).then(function () {
-                if (sel.service) servEl.value = sel.service;
-                return onService().then(function () {
-                    if (sel.destination) destEl.value = sel.destination;
-                    onDest();
+        fill(tProgEl, names, "Pick screen…");
+        return onTermProgram()
+            .then(function () { return fetch("/api/board/state"); })
+            .then(function (r) { return r.json(); }).then(function (s) {
+                var sel = s.selection || {};
+                if (sel.program && names.indexOf(sel.program) >= 0) progEl.value = sel.program;
+                return refreshFiles().then(onProgram).then(function () {
+                    if (sel.service) servEl.value = sel.service;
+                    return onService().then(function () {
+                        if (sel.destination) destEl.value = sel.destination;
+                        onDest();
+                    });
                 });
-            });
-        }).catch(function () { return refreshFiles().then(onProgram); });
+            }).catch(function () { return refreshFiles().then(onProgram); });
     }).catch(function (e) { console.error(e); });
 
     buildEditor(null);

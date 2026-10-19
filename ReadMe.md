@@ -186,6 +186,11 @@ the destination to the LED board, which keeps looping it as normal.
   `This is our final stop`), with an optional per-service override in
   the service file's own settings. No per-stop wording — every stop in
   a service announces the same way.
+* **Terminating screen:** below the Link row, point the destination at
+  another program/service/destination (e.g. one showing "Bus terminates
+  here"). When the final stop arrives, the board switches to it
+  automatically; starting a new route pushes the new destination as
+  normal. API: `POST /api/nextstop/terminating`.
 
 ### Live preview from Sign Studio
 
