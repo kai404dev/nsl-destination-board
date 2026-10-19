@@ -1159,6 +1159,280 @@ def delete_bitmap(root: Path, rel: str) -> tuple[bool, str]:
     return True, "deleted"
 
 
+# ---------------------------------------------------------------------------
+# Next-stop services: route stop lists with GPS triggers.
+#
+# Files live in ``services/*.service`` (JSON). Each destination in a
+# ``programs/*.dest`` file points at one via an optional
+# ``"nextstop_service"`` key holding the service name (no extension).
+#
+# Service shape::
+#
+#     {"route_number": "83",
+#      "destination": "Lower Hutt - Queensgate",
+#      "trigger_radius_m": 60, "approach_radius_m": 250,
+#      "stops": [{"name": ..., "sub": ..., "lat": -41.27, "lon": 174.78,
+#                 "radius_m": 60, "approach_m": 250,
+#                 "announce_next": "...", "announce_here": "...",
+#                 "audio_next": "audio/x.mp3", "audio_here": ""}]}
+#
+# ``announce_*`` fall back to auto text ("Next stop, <name>" /
+# "<name>[, <sub>]"). ``audio_*`` are optional repo-relative paths under
+# ``audio/`` - when set the browser plays the file instead of TTS, which
+# is also the hook for pre-made or local-AI voices.
+# ---------------------------------------------------------------------------
+
+SERVICE_FILE_RE = re.compile(r"[A-Za-z0-9_-]+")
+SERVICES_DIR_NAME = "services"
+
+AUDIO_DIR_NAME = "audio"
+AUDIO_ALLOWED_EXTS = {".mp3", ".wav", ".ogg", ".m4a", ".flac"}
+
+
+def _services_dir(root: Path) -> Path:
+    from pathlib import Path as _P
+
+    return _P(root) / SERVICES_DIR_NAME
+
+
+def _service_path(root: Path, name: str) -> Path | None:
+    from pathlib import Path as _P
+
+    if not name or not SERVICE_FILE_RE.fullmatch(name):
+        return None
+    try:
+        resolved = (_P(root) / SERVICES_DIR_NAME / (name + ".service")).resolve()
+        resolved.relative_to(_P(root).resolve())
+    except (OSError, ValueError):
+        return None
+    return resolved
+
+
+def list_nextstop_services(root: Path) -> list[str]:
+    try:
+        return sorted(p.stem for p in _services_dir(root).glob("*.service")
+                      if p.is_file())
+    except OSError:
+        return []
+
+
+def _clean_service_stop(raw) -> dict | None:
+    if not isinstance(raw, dict):
+        return None
+    name = str(raw.get("name") or "").strip()
+    if not name:
+        return None
+    try:
+        lat = float(raw.get("lat"))
+        lon = float(raw.get("lon"))
+    except (TypeError, ValueError):
+        return None
+    if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+        return None
+
+    def _radius(v, default: int) -> int:
+        try:
+            iv = int(v)
+        except (TypeError, ValueError):
+            return default
+        return max(10, min(2000, iv))
+
+    def _text(v) -> str:
+        return str(v or "").strip()[:500]
+
+    def _audio(v) -> str:
+        s = str(v or "").strip().replace("\\", "/").lstrip("/")
+        if not s:
+            return ""
+        if not s.startswith(AUDIO_DIR_NAME + "/"):
+            return ""
+        if Path(s).suffix.lower() not in AUDIO_ALLOWED_EXTS:
+            return ""
+        return s
+
+    return {
+        "name": name[:120],
+        "sub": str(raw.get("sub") or "").strip()[:120],
+        "lat": lat,
+        "lon": lon,
+        "radius_m": _radius(raw.get("radius_m", raw.get("trigger_radius_m", 60)), 60),
+        "approach_m": _radius(raw.get("approach_m", raw.get("approach_radius_m", 250)), 250),
+        "announce_next": _text(raw.get("announce_next")),
+        "announce_here": _text(raw.get("announce_here")),
+        "audio_next": _audio(raw.get("audio_next")),
+        "audio_here": _audio(raw.get("audio_here")),
+    }
+
+
+def sanitise_service(data: dict) -> dict | None:
+    """Coerce raw JSON to a clean service dict, or None when invalid."""
+    if not isinstance(data, dict):
+        return None
+    stops = data.get("stops")
+    if not isinstance(stops, list):
+        return None
+    clean_stops = []
+    for raw in stops:
+        s = _clean_service_stop(raw)
+        if s is not None:
+            clean_stops.append(s)
+    # Empty lists are allowed when loading (fresh shell), but save
+    # refuses them (see save_nextstop_service).
+
+    def _radius(v, default: int) -> int:
+        try:
+            iv = int(v)
+        except (TypeError, ValueError):
+            return default
+        return max(10, min(2000, iv))
+
+    return {
+        "route_number": str(data.get("route_number") or "").strip()[:20],
+        "origin": str(data.get("origin") or "").strip()[:120],
+        "destination": str(data.get("destination") or "").strip()[:160],
+        "trigger_radius_m": _radius(data.get("trigger_radius_m", 60), 60),
+        "approach_radius_m": _radius(data.get("approach_radius_m", 250), 250),
+        "stops": clean_stops,
+    }
+
+
+def load_nextstop_service(root: Path, name: str) -> dict | None:
+    path = _service_path(root, name or "")
+    if path is None or not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    clean = sanitise_service(data)
+    return clean
+
+
+def save_nextstop_service(root: Path, name: str, data: dict) -> tuple[bool, str]:
+    path = _service_path(root, name or "")
+    if path is None:
+        return False, "invalid service name (letters, digits, - and _ only)"
+    clean = sanitise_service(data) if isinstance(data, dict) else None
+    if clean is None:
+        return False, "service must be an object with a stops list"
+    if not clean["stops"]:
+        return False, "service needs at least one stop with name + lat/lon"
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".service.tmp")
+        tmp.write_text(json.dumps(clean, indent=2) + "\n", encoding="utf-8")
+        tmp.replace(path)
+    except OSError as exc:
+        return False, f"cannot write service: {exc}"
+    return True, "saved"
+
+
+def create_nextstop_service(root: Path, name: str) -> tuple[bool, str]:
+    path = _service_path(root, name or "")
+    if path is None:
+        return False, "invalid service name (letters, digits, - and _ only)"
+    if path.is_file():
+        return False, "service already exists"
+    blank = {"route_number": "", "origin": "", "destination": "",
+             "trigger_radius_m": 60, "approach_radius_m": 250, "stops": []}
+    # Allow creating an empty shell - stops are added via PUT.
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".service.tmp")
+        tmp.write_text(json.dumps(blank, indent=2) + "\n", encoding="utf-8")
+        tmp.replace(path)
+    except OSError as exc:
+        return False, f"cannot write service: {exc}"
+    return True, "created"
+
+
+def delete_nextstop_service(root: Path, name: str) -> tuple[bool, str]:
+    path = _service_path(root, name or "")
+    if path is None:
+        return False, "invalid service name"
+    if not path.is_file():
+        return False, "service not found"
+    try:
+        path.unlink()
+    except OSError as exc:
+        return False, f"cannot delete service: {exc}"
+    return True, "deleted"
+
+
+def get_destination_nextstop(program: dict, service: str,
+                             destination: str) -> str:
+    try:
+        dest = ((program.get("services") or {}).get(service) or {}).get(destination) or {}
+        return str(dest.get("nextstop_service") or "")
+    except AttributeError:
+        return ""
+
+
+def set_destination_nextstop(programs_dir: Path, program_name: str,
+                             service: str, destination: str,
+                             nextstop: str) -> tuple[bool, str]:
+    """Point one .dest destination at a .service file ("" to unlink)."""
+    from pathlib import Path as _P
+
+    data = load_program(_P(programs_dir), program_name or "")
+    if data is None:
+        return False, "program not found"
+    group = (data.get("services") or {}).get(service)
+    if not isinstance(group, dict) or destination not in group:
+        return False, "destination not found"
+    dest = group.get(destination)
+    if not isinstance(dest, dict):
+        return False, "destination not found"
+    clean = str(nextstop or "").strip()
+    if clean and not SERVICE_FILE_RE.fullmatch(clean):
+        return False, "invalid service name"
+    if clean:
+        dest["nextstop_service"] = clean
+    else:
+        dest.pop("nextstop_service", None)
+    return save_program(_P(programs_dir), program_name, data)
+
+
+def list_audio_files(root: Path) -> list[dict]:
+    """Return sorted [{path, bytes}] for every playable file under audio/."""
+    from pathlib import Path as _P
+
+    base = _P(root) / AUDIO_DIR_NAME
+    out: list[dict] = []
+    try:
+        files = sorted(p for p in base.rglob("*") if p.is_file())
+    except OSError:
+        return []
+    root_resolved = _P(root).resolve()
+    for p in files:
+        if p.suffix.lower() not in AUDIO_ALLOWED_EXTS:
+            continue
+        try:
+            rel = p.resolve().relative_to(root_resolved).as_posix()
+            out.append({"path": rel, "bytes": p.stat().st_size})
+        except (OSError, ValueError):
+            continue
+    return out
+
+
+def _resolve_audio_rel(root: Path, rel: str) -> Path | None:
+    from pathlib import Path as _P
+
+    if not rel or not isinstance(rel, str):
+        return None
+    rel = rel.strip().replace("\\", "/").lstrip("/")
+    if not rel.startswith(AUDIO_DIR_NAME + "/"):
+        return None
+    try:
+        resolved = (_P(root) / rel).resolve()
+        resolved.relative_to(_P(root).resolve())
+        base = (_P(root) / AUDIO_DIR_NAME).resolve()
+        resolved.relative_to(base)
+    except (OSError, ValueError):
+        return None
+    return resolved
+
+
 def sanitise_page_images(images) -> list[dict]:
     """Coerce a page's images list to [{src,x,y,w,h}] with sane bounds."""
     if not isinstance(images, list):

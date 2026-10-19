@@ -147,6 +147,31 @@ boot screen) the panels stay blank. API:
   editor preview (pauses the normal display, auto-resumes after expiry,
   max 300s), `DELETE /api/board/preview` to stop early
 
+### Next stop (laptop display + TTS + GPS)
+
+Open `/nextstop`. It replicates the bus interior TFT from the reference —
+route number + destination + time on top, stop timeline below with the
+current stop ringed in yellow. While a route runs, **Start** also pushes
+the destination to the LED board, which keeps looping it as normal.
+
+* **Testing:** Prev/Next buttons or click any stop to jump to it.
+  Each jump speaks the arrival; stepping forward also speaks the
+  "next stop" warning. Hear next / Hear arrival replay them.
+* **IRL:** enable GPS auto-advance — browser geolocation watches your
+  position and fires *approach* ("Next stop, …") at `approach_m` metres
+  and *arrival* ("…") inside `radius_m` metres, advancing the timeline.
+* **TTS:** browser speechSynthesis by default (voice + rate pickers).
+  Per-stop `audio_next` / `audio_here` paths under `audio/` play a
+  premade file instead — the hook pre-made MP3s and a future local-AI
+  voice (`POST /api/tts`) share.
+* **Files:** `services/*.service` hold the stops + GPS points. Each
+  `.dest` destination points at one via `"nextstop_service": "<name>"`
+  — set it from the page (pick file → Link), which saves back into the
+  `.dest` via `POST /api/nextstop/link`, or hand-edit. API:
+  `GET/POST /api/nextstop/services`, `GET/PUT/DELETE
+  /api/nextstop/services/<name>`, `POST /api/nextstop/link`,
+  `GET /api/audio` (+ `/audio/<path>` static).
+
 ### Live preview from Sign Studio
 
 The editor's Save tab has **Preview on board**: pushes the current draft

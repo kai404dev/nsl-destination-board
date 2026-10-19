@@ -1,0 +1,45 @@
+{
+  "route_number": "83",
+  "origin": "Wellington",
+  "destination": "Lower Hutt - Queensgate",
+  "trigger_radius_m": 60,
+  "approach_radius_m": 250,
+  "stops": [
+    {
+      "name": "Lambton Quay North",
+      "sub": "Stop B",
+      "lat": -41.2849,
+      "lon": 174.7755,
+      "radius_m": 60,
+      "approach_m": 250,
+      "announce_next": "Next stop, Lambton Quay North, Stop B",
+      "announce_here": "Lambton Quay North, Stop B",
+      "audio_next": "",
+      "audio_here": ""
+    },
+    {
+      "name": "Wellington Station",
+      "sub": "Stop E",
+      "lat": -41.2783,
+      "lon": 174.7807,
+      "radius_m": 60,
+      "approach_m": 250,
+      "announce_next": "Next stop, Wellington Station, Stop E",
+      "announce_here": "Wellington Station, Stop E. Change here for trains.",
+      "audio_next": "",
+      "audio_here": ""
+    },
+    {
+      "name": "Thorndon Quay",
+      "sub": "Capital Gateway opposite",
+      "lat": -41.2735,
+      "lon": 174.7825,
+      "radius_m": 60,
+      "approach_m": 250,
+      "announce_next": "Next stop, Thorndon Quay, Capital Gateway opposite",
+      "announce_here": "Thorndon Quay, Capital Gateway opposite",
+      "audio_next": "",
+      "audio_here": ""
+    }
+  ]
+}

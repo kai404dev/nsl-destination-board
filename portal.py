@@ -26,6 +26,14 @@ Routes:
     /api/board/select                 -> POST {program,service,destination}
     /api/board/preview                -> POST {page,width,height,seconds}
                                        (live editor preview), DELETE to stop
+    /api/nextstop/services            -> GET list / POST {name} (.service files)
+    /api/nextstop/services/<name>     -> GET/PUT/DELETE one .service file
+    /api/nextstop/link                -> POST {program,service,destination,
+                                       nextstop_service} ("" to unlink)
+    /api/audio                        -> GET list of premade announcement files
+    /api/tts                          -> POST {text} (local-AI hook, 501 until
+                                       configured - browser TTS is used)
+    /audio/<path>                     -> raw announcement audio files
     /fonts/<path>                     -> raw BDF font files (canvas preview)
 """
 
@@ -51,6 +59,7 @@ PAGES_DIR = TEMPLATE_DIR / "pages"
 FONTS_DIR = ROOT / "fonts"
 PROGRAMS_DIR = ROOT / "programs"
 BITMAPS_DIR = ROOT / "bitmaps"
+AUDIO_DIR = ROOT / "audio"
 MAX_PROGRAM_BYTES = 2 * 1024 * 1024
 
 
@@ -122,6 +131,8 @@ PAGE_ROUTES = {
     "/studio.html": "studio.html",
     "/controller": "controller.html",
     "/controller.html": "controller.html",
+    "/nextstop": "nextstop.html",
+    "/nextstop.html": "nextstop.html",
 }
 
 
@@ -151,6 +162,13 @@ class BoardHandler(SimpleHTTPRequestHandler):
         if url_path.startswith("/bitmaps/"):
             rel = url_path[len("/bitmaps/"):]
             return self._serve_file(BITMAPS_DIR / rel, base=BITMAPS_DIR)
+
+        # 0b. Premade announcement audio: /audio/<path> -> audio/<path>.
+        if url_path == "/audio" or url_path == "/audio/":
+            return self._listing("audio", AUDIO_DIR)
+        if url_path.startswith("/audio/"):
+            rel = url_path[len("/audio/"):]
+            return self._serve_file(AUDIO_DIR / rel, base=AUDIO_DIR)
 
         # 1. Top-level pages: / , /studio, /controller (+ .html variants).
         if url_path in PAGE_ROUTES:
@@ -221,6 +239,17 @@ class BoardHandler(SimpleHTTPRequestHandler):
             return self._serve_json(api.list_programs(PROGRAMS_DIR))
         if url_path in ("/api/bitmaps", "/api/bitmaps/"):
             return self._serve_json(api.list_bitmaps(ROOT))
+        if url_path in ("/api/audio", "/api/audio/"):
+            return self._serve_json(api.list_audio_files(ROOT))
+        if url_path in ("/api/nextstop/services", "/api/nextstop/services/"):
+            return self._serve_json(api.list_nextstop_services(ROOT))
+        if url_path.startswith("/api/nextstop/services/"):
+            name = urllib.parse.unquote(
+                url_path[len("/api/nextstop/services/"):].strip("/"))
+            svc = api.load_nextstop_service(ROOT, name)
+            if svc is None:
+                return self._serve_json({"error": "service not found"}, status=404)
+            return self._serve_json(svc)
         if url_path in ("/api/board/state", "/api/board/state/"):
             return self._serve_json(_board_state_payload())
         if url_path in ("/api/board/config", "/api/board/config/"):
@@ -239,6 +268,18 @@ class BoardHandler(SimpleHTTPRequestHandler):
         url_path = posixpath.normpath(parsed.path or "/")
         if parsed.path.endswith("/") and url_path != "/":
             url_path += "/"
+        # Save (overwrite) a .service next-stop file.
+        if url_path.startswith("/api/nextstop/services/"):
+            name = urllib.parse.unquote(
+                url_path[len("/api/nextstop/services/"):].strip("/"))
+            data, error = self._read_json_body()
+            if error:
+                return self._serve_json({"error": error}, status=400)
+            ok, message = api.save_nextstop_service(ROOT, name, data)
+            if not ok:
+                status = 404 if message == "service not found" else 400
+                return self._serve_json({"error": message}, status=status)
+            return self._serve_json({"ok": True})
         # Save (overwrite) a .dest program.
         if url_path.startswith("/api/programs/"):
             name = urllib.parse.unquote(url_path[len("/api/programs/"):].strip("/"))
@@ -324,6 +365,16 @@ class BoardHandler(SimpleHTTPRequestHandler):
         if parsed.path.endswith("/") and url_path != "/":
             url_path += "/"
 
+        # Delete a .service file.
+        if url_path.startswith("/api/nextstop/services/"):
+            name = urllib.parse.unquote(
+                url_path[len("/api/nextstop/services/"):].strip("/"))
+            ok, message = api.delete_nextstop_service(ROOT, name)
+            if not ok:
+                status = 404 if message == "service not found" else 400
+                return self._serve_json({"error": message}, status=status)
+            return self._serve_json({"ok": True})
+
         # Stop a live editor preview (board resumes its selection).
         if url_path in ("/api/board/preview", "/api/board/preview/"):
             api.clear_preview()
@@ -355,6 +406,47 @@ class BoardHandler(SimpleHTTPRequestHandler):
         if parsed.path.endswith("/") and url_path != "/":
             url_path += "/"
 
+        # Create a new .service shell: POST {"name": "..."}.
+        if url_path in ("/api/nextstop/services", "/api/nextstop/services/"):
+            data, error = self._read_json_body()
+            if error:
+                return self._serve_json({"error": error}, status=400)
+            name = data.get("name") if isinstance(data, dict) else ""
+            ok, message = api.create_nextstop_service(ROOT, (name or "").strip())
+            if not ok:
+                status = 409 if message == "service already exists" else 400
+                return self._serve_json({"error": message}, status=status)
+            return self._serve_json({"ok": True, "name": (name or "").strip()}, status=201)
+
+        # Link a .dest destination to a .service file ("" to unlink).
+        if url_path in ("/api/nextstop/link", "/api/nextstop/link/"):
+            data, error = self._read_json_body()
+            if error:
+                return self._serve_json({"error": error}, status=400)
+            if not isinstance(data, dict):
+                return self._serve_json({"error": "body must be JSON"}, status=400)
+            if data.get("nextstop_service"):
+                # Validate the target service exists (unless unlinking).
+                if api.load_nextstop_service(
+                        ROOT, str(data.get("nextstop_service") or "")) is None:
+                    return self._serve_json({"error": "next-stop service not found"},
+                                            status=404)
+            ok, message = api.set_destination_nextstop(
+                PROGRAMS_DIR, str(data.get("program") or ""),
+                str(data.get("service") or ""),
+                str(data.get("destination") or ""),
+                str(data.get("nextstop_service") or ""))
+            if not ok:
+                return self._serve_json({"error": message}, status=400)
+            return self._serve_json({"ok": True})
+
+        # Local-AI TTS hook (not configured yet): POST {"text": "..."}.
+        # Always falls back to browser TTS / premade audio for now. A future
+        # provider can implement this route to return {"audio": "/audio/x.mp3"}.
+        if url_path in ("/api/tts", "/api/tts/"):
+            return self._serve_json(
+                {"error": "local AI TTS not configured - using browser TTS"},
+                status=501)
         # Upload a bitmap: POST {filename, data (base64 or data-URL)}.
         if url_path in ("/api/bitmaps", "/api/bitmaps/"):
             data, error = self._read_json_body()

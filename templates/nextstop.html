@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Next Stop | NSL Board Portal</title>
+    <link rel="stylesheet" href="/static/css/portal.css">
+    <link rel="stylesheet" href="/static/css/nextstop.css">
+</head>
+<body>
+    <header class="topbar">
+        <a class="brand" href="/">NSL Board</a>
+        <span class="topbar-title">Next Stop</span>
+        <span class="topbar-right" id="ns-clock">--:--</span>
+    </header>
+
+    <div class="ns-layout">
+        <!-- Bus display: replicates the interior TFT from the reference shot -->
+        <section class="ns-display-wrap">
+            <div class="ns-display" id="ns-display" aria-live="polite">
+                <button id="ns-fsexit" class="ns-fsexit" type="button" title="Exit fullscreen (Esc)">✕</button>
+                <div class="ns-header">
+                    <div class="ns-route" id="ns-route">–</div>
+                    <div class="ns-dest" id="ns-dest">No route loaded</div>
+                    <div class="ns-time"><span>Time now</span><strong id="ns-time">--:--</strong></div>
+                </div>
+                <ol class="ns-stops" id="ns-stops"></ol>
+                <div class="ns-footer" id="ns-footer">Pick a program / destination, then Start.</div>
+            </div>
+            <div class="ns-transport">
+                <button id="ns-prev" class="btn-primary" type="button">◀ Prev stop</button>
+                <button id="ns-say-next" class="tbtn" type="button">Hear next</button>
+                <button id="ns-say-here" class="tbtn" type="button">Hear arrival</button>
+                <button id="ns-next" class="btn-primary" type="button">Next stop ▶</button>
+                <button id="ns-fs" class="tbtn" type="button" title="Fullscreen the bus display (F)">⛶ Full</button>
+            </div>
+        </section>
+
+        <!-- Controls: route + GPS + TTS + service file editor -->
+        <section class="ns-controls">
+            <h2>Route</h2>
+            <label for="ns-program">Program (.dest)</label>
+            <select id="ns-program"><option>Loading…</option></select>
+            <div class="ns-row">
+                <div>
+                    <label for="ns-service">Service</label>
+                    <select id="ns-service"><option>–</option></select>
+                </div>
+                <div>
+                    <label for="ns-destination">Destination</label>
+                    <select id="ns-destination"><option>–</option></select>
+                </div>
+            </div>
+            <label for="ns-servicefile">Next-stop service file (.service)</label>
+            <div class="ns-row">
+                <select id="ns-servicefile"><option value="">– none –</option></select>
+                <button id="ns-link" class="tbtn" type="button" title="Point this destination at the selected .service file">Link</button>
+            </div>
+            <p class="muted small" id="ns-linkstate"></p>
+            <div class="ns-row">
+                <button id="ns-start" class="btn-primary" type="button">Start route + board</button>
+                <button id="ns-stop" class="tbtn" type="button">Stop</button>
+            </div>
+            <p class="muted small">Start also pushes the destination to the LED board (board keeps looping it).</p>
+
+            <h2>Triggers</h2>
+            <label class="check-row"><input type="checkbox" id="ns-tts" checked> Voice announcements</label>
+            <label class="check-row"><input type="checkbox" id="ns-gps" checked> GPS auto-advance (browser location)</label>
+            <label for="ns-voice">Voice</label>
+            <select id="ns-voice"><option value="">System default</option></select>
+            <div class="ns-row">
+                <div>
+                    <label for="ns-rate">Rate</label>
+                    <input type="number" id="ns-rate" min="0.5" max="2" step="0.1" value="1">
+                </div>
+                <div>
+                    <label for="ns-approach">Approach (m)</label>
+                    <input type="number" id="ns-approach" min="10" max="2000" step="10" value="250">
+                </div>
+                <div>
+                    <label for="ns-radius">Arrival (m)</label>
+                    <input type="number" id="ns-radius" min="10" max="2000" step="10" value="60">
+                </div>
+            </div>
+            <p class="muted small" id="ns-gpsstate">GPS: off</p>
+
+            <h2>Service file editor</h2>
+            <p class="muted small">Stops + GPS points that trigger announcements. Click a stop on the
+            display to jump to it for testing. “Use GPS” fills lat/lon from your position.</p>
+            <div class="ns-row">
+                <input type="text" id="ns-newname" placeholder="new-service-name">
+                <button id="ns-create" class="tbtn" type="button">New</button>
+            </div>
+            <div id="ns-editor"></div>
+            <div class="ns-row">
+                <button id="ns-addstop" class="tbtn" type="button">+ Add stop</button>
+                <button id="ns-save" class="btn-primary" type="button">Save .service</button>
+            </div>
+            <p class="muted small" id="ns-savestate" role="status"></p>
+
+            <h2>Premade / AI audio</h2>
+            <p class="muted small">Per-stop <code>audio_next</code> / <code>audio_here</code> paths
+            (under <code>audio/</code>) play instead of browser TTS — drop in pre-made MP3s now;
+            a local-AI voice can fill the same hook later via <code>POST /api/tts</code>.</p>
+            <label class="check-row"><input type="checkbox" id="ns-localai"> Try local AI TTS first (falls back to browser)</label>
+            <div id="ns-audiolist" class="muted small">Loading audio…</div>
+        </section>
+    </div>
+
+    <script src="/static/js/nextstop.js"></script>
+</body>
+</html>
