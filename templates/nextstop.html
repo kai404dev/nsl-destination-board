@@ -84,6 +84,21 @@
             </div>
             <p class="muted small" id="ns-gpsstate">GPS: off</p>
 
+            <h2>Announcement wording</h2>
+            <p class="muted small">Global default reused for every stop of every
+            service — {stop} = stop name. A service file can override these
+            in its own settings above the stops list.</p>
+            <label for="ns-gtmpl-next">Next stop (approach)</label>
+            <input type="text" id="ns-gtmpl-next" class="full" placeholder="Next stop, {stop}" value="">
+            <label for="ns-gtmpl-here">Now approaching (arrival)</label>
+            <input type="text" id="ns-gtmpl-here" class="full" placeholder="We are now approaching, {stop}" value="">
+            <label for="ns-gtmpl-last">Final stop</label>
+            <input type="text" id="ns-gtmpl-last" class="full" placeholder="This is our final stop, {stop}" value="">
+            <div class="ns-row">
+                <button id="ns-gtmpl-save" class="tbtn" type="button">Save wording</button>
+            </div>
+            <p class="muted small" id="ns-gtmpl-state" role="status"></p>
+
             <h2>Service file editor</h2>
             <p class="muted small">Stops + GPS points that trigger announcements. Click a stop on the
             display to jump to it for testing. “Use GPS” fills lat/lon from your position.</p>
@@ -101,7 +116,8 @@
             <h2>Premade / AI audio</h2>
             <p class="muted small">Per-stop <code>audio_next</code> / <code>audio_here</code> paths
             (under <code>audio/</code>) play instead of browser TTS — drop in pre-made MP3s now;
-            a local-AI voice (Piper, like the Bus Audio Studio repo) fills the same hook.</p>
+            a local-AI voice (Piper, like the Bus Audio Studio repo) fills the same hook.
+            <code>audio_name</code> plays just the stop-name clip inside the worded message.</p>
             <label class="check-row"><input type="checkbox" id="ns-localai"> Local AI TTS (Piper) first, browser fallback</label>
             <label for="ns-piper-voice">Piper voice</label>
             <div class="ns-row">

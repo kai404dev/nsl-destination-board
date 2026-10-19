@@ -907,17 +907,29 @@ def save_selection(root: Path, program: str, service: str,
 #     {"startup_mode": "resume|default|blank",
 #      "startup_program": ..., "startup_service": ...,
 #      "startup_destination": ..., "boot_screen": true,
-#      "boot_bitmap": "bitmaps/shared/custom.png" | ""}
+#      "boot_bitmap": "bitmaps/shared/custom.png" | "",
+#      "announce_templates": {"next": ..., "here": ..., "last": ...}}
 #
 # startup_mode resume keeps the last board selection across reboots,
 # default plays one configured destination, blank boots clear (as before).
 # boot_screen shows the splash first; boot_bitmap replaces the built-in
 # splash pages with one fullscreen bitmap (scaled to fit).
+# announce_templates is the global announcement wording, reused for every
+# stop of every service unless that service overrides it (see the
+# next-stop section). {stop} = stop name.
 # ---------------------------------------------------------------------------
 
 CONFIG_FILE = "board_config.json"
 
 STARTUP_MODES = ("resume", "default", "blank")
+
+# Announcement wording - the single set reused for every stop.
+# {stop} = the stop's short name.
+ANNOUNCE_TEMPLATE_DEFAULTS = {
+    "next": "Next stop, {stop}",
+    "here": "We are now approaching, {stop}",
+    "last": "This is our final stop, {stop}",
+}
 
 DEFAULT_CONFIG = {
     "startup_mode": "blank",
@@ -926,6 +938,7 @@ DEFAULT_CONFIG = {
     "startup_destination": "",
     "boot_screen": True,
     "boot_bitmap": "",
+    "announce_templates": dict(ANNOUNCE_TEMPLATE_DEFAULTS),
 }
 
 
@@ -948,6 +961,9 @@ def load_config(root: Path) -> dict:
             cfg[key] = raw[key]
     if isinstance(raw.get("boot_screen"), bool):
         cfg["boot_screen"] = raw["boot_screen"]
+    if isinstance(raw.get("announce_templates"), dict):
+        cfg["announce_templates"] = _complete_announce_templates(
+            raw.get("announce_templates"))
     return cfg
 
 
@@ -970,6 +986,11 @@ def save_config(root: Path, data: dict) -> tuple[bool, str]:
             cfg[key] = data[key]
     if "boot_screen" in data:
         cfg["boot_screen"] = bool(data["boot_screen"])
+    if "announce_templates" in data:
+        if not isinstance(data["announce_templates"], dict):
+            return False, "announce_templates must be an object"
+        cfg["announce_templates"] = _complete_announce_templates(
+            data["announce_templates"])
     if "boot_bitmap" in data:
         rel = data["boot_bitmap"]
         if not isinstance(rel, str):
@@ -1003,6 +1024,24 @@ def save_config(root: Path, data: dict) -> tuple[bool, str]:
     except OSError as exc:
         return False, f"cannot write config: {exc}"
     return True, "saved"
+
+
+def get_global_announce_templates(root: Path) -> dict:
+    """Return the complete global announcement templates (built-in filled)."""
+    from pathlib import Path as _P
+
+    try:
+        raw = (load_config(_P(root)).get("announce_templates") or {})
+    except Exception:
+        raw = {}
+    return _complete_announce_templates(raw)
+
+
+def save_global_announce_templates(root: Path, data: dict) -> tuple[bool, str]:
+    """Replace the global announcement templates. Returns (ok, message)."""
+    if not isinstance(data, dict):
+        return False, "body must be JSON"
+    return save_config(root, {"announce_templates": data})
 
 
 # ---------------------------------------------------------------------------
@@ -1172,50 +1211,99 @@ def delete_bitmap(root: Path, rel: str) -> tuple[bool, str]:
 #      "destination": "Lower Hutt - Queensgate",
 #      "trigger_radius_m": 60, "approach_radius_m": 250,
 #      "announce_templates": {"next": "Next stop, {stop}",
-#                             "here": "{stop}",
-#                             "last": "This is our last stop, {stop}"},
+#                             "here": "We are now approaching, {stop}",
+#                             "last": "This is our final stop, {stop}"},
 #      "stops": [{"name": ..., "sub": ..., "lat": -41.27, "lon": 174.78,
 #                 "radius_m": 60, "approach_m": 250,
-#                 "announce_next": "...", "announce_here": "...",
-#                 "audio_next": "audio/x.mp3", "audio_here": ""}]}
+#                 "audio_next": "audio/x.mp3", "audio_here": "",
+#                 "audio_name": "audio/market-place.mp3"}]}
 #
-# ``announce_templates`` holds the service-wide wording: ``next`` fires at
-# the approach radius, ``here`` on arrival, ``last`` on final-stop
-# arrival. ``{stop}`` (any case) is replaced with the stop's short name;
-# a template without the slot is used literally for every stop. Missing
-# keys fall back to the defaults above. A per-stop ``announce_next`` /
-# ``announce_here`` / ``announce_last`` still wins over its template.
+# ``announce_templates`` is the optional per-service override of the
+# global wording, reused for every stop: ``next`` fires at the approach
+# radius, ``here`` on arrival, ``last`` on final-stop arrival. ``{stop}``
+# (any case) is replaced with the stop's short name; a template without
+# the slot is used literally for every stop. Missing keys inherit the
+# global defaults (board config ``announce_templates``, editable on the
+# next-stop page), which themselves fall back to the built-ins above.
 # ``audio_*`` are optional repo-relative paths under ``audio/`` - when
 # set the browser plays the file instead of TTS, which is also the hook
-# for pre-made or local-AI voices.
+# for pre-made or local-AI voices. ``audio_next``/``audio_here``/
+# ``audio_last`` replace the whole announcement; ``audio_name`` replaces
+# just the ``{stop}`` slot, so the template is spoken around your
+# recording ("We are now approaching, " + clip). A clip that fails to
+# load falls back to the spoken name.
 # ---------------------------------------------------------------------------
 
 SERVICE_FILE_RE = re.compile(r"[A-Za-z0-9_-]+")
 SERVICES_DIR_NAME = "services"
 
-# Service-wide announcement wording. {stop} = the stop's short name.
-ANNOUNCE_TEMPLATE_DEFAULTS = {
-    "next": "Next stop, {stop}",
-    "here": "{stop}",
-    "last": "This is our last stop, {stop}",
-}
-
 
 def clean_announce_templates(raw) -> dict:
-    """Coerce raw templates to {next, here, last}, filling defaults."""
-    if not isinstance(raw, dict):
-        raw = {}
+    """Coerce raw templates to a partial {next, here, last} dict.
+
+    Only explicitly-set (non-empty) keys are kept - a missing key means
+    "inherit" (service files inherit the global defaults, the global
+    config inherits the built-in defaults). Values capped at 500 chars.
+    """
     out = {}
-    for key in ("next", "here", "last"):
-        t = str(raw.get(key) or "").strip()[:500]
-        out[key] = t or ANNOUNCE_TEMPLATE_DEFAULTS[key]
+    if isinstance(raw, dict):
+        for key in ("next", "here", "last"):
+            t = str(raw.get(key) or "").strip()[:500]
+            if t:
+                out[key] = t
     return out
+
+
+def _complete_announce_templates(partial) -> dict:
+    """Fill a partial templates dict with built-in defaults (complete)."""
+    merged = dict(ANNOUNCE_TEMPLATE_DEFAULTS)
+    if isinstance(partial, dict):
+        for key in ("next", "here", "last"):
+            t = str(partial.get(key) or "").strip()[:500]
+            if t:
+                merged[key] = t
+    return merged
+
+
+def resolve_announce_templates(root, service_templates=None) -> dict:
+    """Merge announcement wording: built-in <- global <- service.
+
+    Returns a complete {next, here, last} dict - every key filled, so
+    callers can render directly. The service override wins over the
+    global default, which wins over the built-in.
+    """
+    from pathlib import Path as _P
+
+    try:
+        global_t = (load_config(_P(root)).get("announce_templates") or {})
+    except Exception:
+        global_t = {}
+    return _complete_announce_templates(
+        {**clean_announce_templates(global_t),
+         **clean_announce_templates(service_templates)})
 
 
 def render_announcement(template: str, short: str) -> str:
     """Fill an announcement template's ``{stop}`` slot (any case)."""
     return re.sub(r"\{stop\}", str(short or ""), str(template or ""),
                   flags=re.IGNORECASE)
+
+
+def tts_template_parts(template: str, short: str, name_audio: str) -> list[str]:
+    """TTS texts the page will request for one templated announcement.
+
+    Mirrors the page's speechItems(): no name clip -> the full rendered
+    line; with a clip -> each non-empty text segment around the ``{stop}``
+    slots, plus the bare short name (spoken only if the clip fails to
+    load, so pre-baking it keeps even the fallback instant).
+    """
+    if not (name_audio or "").strip():
+        return [render_announcement(template, short)]
+    segs = re.split(r"\{stop\}", str(template or ""), flags=re.IGNORECASE)
+    out = [seg for seg in segs if seg]
+    if short and short not in out:
+        out.append(short)
+    return out or [short]
 
 AUDIO_DIR_NAME = "audio"
 AUDIO_ALLOWED_EXTS = {".mp3", ".wav", ".ogg", ".m4a", ".flac"}
@@ -1269,9 +1357,6 @@ def _clean_service_stop(raw) -> dict | None:
             return default
         return max(10, min(2000, iv))
 
-    def _text(v) -> str:
-        return str(v or "").strip()[:500]
-
     def _audio(v) -> str:
         s = str(v or "").strip().replace("\\", "/").lstrip("/")
         if not s:
@@ -1289,12 +1374,10 @@ def _clean_service_stop(raw) -> dict | None:
         "lon": lon,
         "radius_m": _radius(raw.get("radius_m", raw.get("trigger_radius_m", 60)), 60),
         "approach_m": _radius(raw.get("approach_m", raw.get("approach_radius_m", 250)), 250),
-        "announce_next": _text(raw.get("announce_next")),
-        "announce_here": _text(raw.get("announce_here")),
-        "announce_last": _text(raw.get("announce_last")),
         "audio_next": _audio(raw.get("audio_next")),
         "audio_here": _audio(raw.get("audio_here")),
         "audio_last": _audio(raw.get("audio_last")),
+        "audio_name": _audio(raw.get("audio_name")),
     }
 
 
@@ -1732,23 +1815,26 @@ def pregen_service_tts(root: Path, service_name: str,
     svc = load_nextstop_service(_P(root), service_name or "")
     if svc is None:
         return False, {"error": "next-stop service not found"}
-    templates = clean_announce_templates(svc.get("announce_templates"))
+    templates = resolve_announce_templates(_P(root), svc.get("announce_templates"))
     texts: list[str] = []
     last_idx = len(svc.get("stops") or []) - 1
     for n, stop in enumerate(svc.get("stops") or []):
-        short = short_stop_name((stop or {}).get("name", ""))
+        st = stop or {}
+        short = short_stop_name(st.get("name", ""))
         if not short:
             continue
-        # Same lines the page speaks (per-stop overrides win over the
-        # service templates), so pre-baked cache hits match live requests.
-        lines = [(stop or {}).get("announce_next")
-                 or render_announcement(templates["next"], short)]
+        # Exactly the TTS lines the page will request: slots covered by a
+        # full-audio override are never spoken, and a stop-name clip splits
+        # the template into speakable segments (see tts_template_parts).
+        name_audio = st.get("audio_name") or ""
+        lines: list[str] = []
+        if not st.get("audio_next"):
+            lines += tts_template_parts(templates["next"], short, name_audio)
         if n == last_idx:
-            lines.append((stop or {}).get("announce_last")
-                         or render_announcement(templates["last"], short))
-        else:
-            lines.append((stop or {}).get("announce_here")
-                         or render_announcement(templates["here"], short))
+            if not (st.get("audio_last") or st.get("audio_here")):
+                lines += tts_template_parts(templates["last"], short, name_audio)
+        elif not st.get("audio_here"):
+            lines += tts_template_parts(templates["here"], short, name_audio)
         for line in lines:
             if line not in texts:
                 texts.append(line)

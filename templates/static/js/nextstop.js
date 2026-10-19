@@ -13,7 +13,8 @@
     var gpsState = $("ns-gpsstate");
 
     var progCache = {};
-    var S = { stops: [], idx: -1, running: false, announcedHere: {}, announcedNext: {}, templates: {} };
+    var S = { stops: [], idx: -1, running: false, announcedHere: {}, announcedNext: {}, templates: {}, awaitPreview: true };
+    var G = { templates: {} }; // global wording: built-in <- board config
     var watchId = null, lastPos = null;
     var NS_WINDOW = 3; // display shows current stop + next two only
 
@@ -54,11 +55,13 @@
 
     /* ---------- TTS layer ----------
        Priority: premade audio file (stop.audio_next/here) -> optional local AI
-       (POST /api/tts, 501 until configured) -> browser speechSynthesis.
-       Announcements are serialised with a short gap after interrupting,
-       so a chopped utterance never pops/clicks into the next one. */
+       (POST /api/tts) -> browser speechSynthesis. Announcements queue up:
+       speak() interrupts by default (fresh trigger drops everything and
+       starts now); chained previews pass interrupt=false and play after
+       the current utterance instead of chopping it. */
     var speakTimer = null, currentAudio = null;
     var voiceActive = false, lastVoiceEnd = 0; // our own speech state
+    var speakQueue = [], speakingItem = null, speakGen = 0, needGap = false;
     function stopAudio() {
         if (speakTimer) { clearTimeout(speakTimer); speakTimer = null; }
         if (currentAudio) {
@@ -70,7 +73,7 @@
         try { return speechSynthesis.speaking || speechSynthesis.pending; }
         catch (e) { return false; }
     }
-    // True when speech is genuinely still in flight (see browserSpeak).
+    // True when speech is genuinely still in flight (see playText).
     function chopIfBusy() {
         var recentEnd = false;
         try { recentEnd = Date.now() - lastVoiceEnd < 300; } catch (e) { }
@@ -78,11 +81,9 @@
         if (busy) { try { speechSynthesis.cancel(); voiceActive = false; } catch (e) { } }
         return busy;
     }
-    function browserSpeak(text) {
-        if (!$("ns-tts").checked || !text) return;
+    function playText(text, fin) {
         try {
-            stopAudio();
-            var wasBusy = chopIfBusy();
+            var wasBusy = voiceActive || engineBusy();
             // Terminal punctuation lets the voice decay instead of cutting
             // off hard at the last word (another end-of-speech click source).
             if (!/[.!?…:;]$/.test(text)) text += ".";
@@ -93,59 +94,102 @@
             u.pitch = 1;
             u.volume = 1;
             u.onstart = function () { voiceActive = true; };
-            var done = function () { voiceActive = false; lastVoiceEnd = Date.now(); };
+            var done = function () { voiceActive = false; lastVoiceEnd = Date.now(); fin(); };
             u.onend = done;
             u.onerror = done;
-            var go = function () { speakTimer = null; try { speechSynthesis.speak(u); } catch (e) { console.warn(e); } };
+            var go = function () { speakTimer = null; try { speechSynthesis.speak(u); } catch (e) { console.warn(e); fin(); } };
             // Gap after chopping the previous utterance: speaking into the
             // same tick as cancel() is what produces the click/pop.
-            if (wasBusy) speakTimer = setTimeout(go, 150);
+            if (needGap || wasBusy) { needGap = false; speakTimer = setTimeout(go, 150); }
             else go();
-        } catch (e) { console.warn(e); }
+        } catch (e) { console.warn(e); fin(); }
     }
-    function playAudioThen(path, fallbackText) {
-        path = (path || "").trim();
-        if (!path) { browserSpeak(fallbackText); return; }
-        stopAudio();
-        chopIfBusy();
+    function playAudio(path, fallbackText, fin) {
         try {
             var a = new Audio(path);
             currentAudio = a;
-            a.onended = function () { if (currentAudio === a) currentAudio = null; };
-            a.onerror = function () { if (currentAudio === a) currentAudio = null; browserSpeak(fallbackText); };
+            a.onended = function () { if (currentAudio === a) currentAudio = null; fin(); };
+            a.onerror = function () { if (currentAudio === a) currentAudio = null; playText(fallbackText, fin); };
             var p = a.play();
-            if (p && p.catch) p.catch(function () { if (currentAudio === a) currentAudio = null; browserSpeak(fallbackText); });
-        } catch (e) { browserSpeak(fallbackText); }
+            if (p && p.catch) p.catch(function () { if (currentAudio === a) currentAudio = null; playText(fallbackText, fin); });
+        } catch (e) { playText(fallbackText, fin); }
     }
-    function speak(text, audioPath) {
-        if (!$("ns-tts").checked || !text) return;
-        if (audioPath && audioPath.trim()) { playAudioThen(audioPath, text); return; }
+    function playItem(item, fin) {
+        if (item.audio) { playAudio(item.audio, item.text, fin); return; }
         if ($("ns-localai").checked) {
-            fetch("/api/tts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: text, voice: piperVoice() }) })
+            fetch("/api/tts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: item.text, voice: piperVoice() }) })
                 .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
                 .then(function (res) {
-                    if (res.ok && res.j && res.j.audio) playAudioThen(res.j.audio, text);
-                    else browserSpeak(text);
-                }).catch(function () { browserSpeak(text); });
+                    if (item.gen !== speakGen) { fin(); return; } // superseded while fetching
+                    if (res.ok && res.j && res.j.audio) playAudio(res.j.audio, item.text, fin);
+                    else playText(item.text, fin);
+                }).catch(function () { playText(item.text, fin); });
             return;
         }
-        browserSpeak(text);
+        playText(item.text, fin);
     }
-    var TMPL_DEFAULTS = { next: "Next stop, {stop}", here: "{stop}", last: "This is our last stop, {stop}" };
-    // Service-wide wording: {stop} = the stop's short name. Per-stop
-    // announce_next/here/last (below) still win over these templates.
-    function tmpl(kind, short) {
-        var t = (S.templates || {})[kind] || TMPL_DEFAULTS[kind];
-        return String(t).replace(/\{stop\}/gi, short);
+    function pumpQueue() {
+        if (speakingItem || !speakQueue.length) return;
+        var item = speakQueue.shift();
+        speakingItem = item;
+        playItem(item, function () {
+            if (speakingItem !== item) return; // superseded by an interrupt
+            speakingItem = null;
+            pumpQueue();
+        });
     }
-    function nextText(s) { return s.announce_next || tmpl("next", shortName(s)); }
-    function hereText(s) { return s.announce_here || tmpl("here", shortName(s)); }
-    function lastText(s) { return s.announce_last || tmpl("last", shortName(s)); }
-    // Arrival speech for stop i: the final stop gets the last-stop message.
-    function arrivalSpeech(i) {
-        var st = S.stops[i];
-        if (i === S.stops.length - 1) return { text: lastText(st), audio: st.audio_last || st.audio_here };
-        return { text: hereText(st), audio: st.audio_here };
+    // interrupt (default true): drop everything and start now. Chained
+    // previews pass false to play after the current utterance.
+    function speak(text, audioPath, interrupt) {
+        if (!$("ns-tts").checked || !text) return;
+        if (interrupt === undefined || interrupt === null) interrupt = true;
+        if (interrupt) {
+            needGap = chopIfBusy();
+            stopAudio();
+            speakQueue = [];
+            speakGen++;
+            speakingItem = null;
+        }
+        speakQueue.push({ text: text, audio: (audioPath || "").trim(), gen: speakGen });
+        pumpQueue();
+    }
+    var TMPL_DEFAULTS = { next: "Next stop, {stop}", here: "We are now approaching, {stop}", last: "This is our final stop, {stop}" };
+    // Single wording reused for every stop: built-in <- global <- service.
+    // S.templates is already fully merged on service load.
+    function rawTmpl(kind) {
+        return (S.templates || {})[kind] || (G.templates || {})[kind] || TMPL_DEFAULTS[kind];
+    }
+    function renderTmpl(template, short) {
+        return String(template).replace(/\{stop\}/gi, short);
+    }
+    // Split a template around every {stop} slot: text segments are spoken,
+    // each slot plays the stop-name clip (falling back to the spoken name
+    // if the clip fails to load).
+    function speechItems(template, short, nameAudio) {
+        if (!nameAudio) return [{ text: renderTmpl(template, short), audio: "" }];
+        var segs = String(template).split(/\{stop\}/gi);
+        var items = [];
+        for (var i = 0; i < segs.length; i++) {
+            if (segs[i]) items.push({ text: segs[i], audio: "" });
+            if (i < segs.length - 1 || segs.length === 1) items.push({ text: short, audio: nameAudio });
+        }
+        return items.length ? items : [{ text: short, audio: nameAudio || "" }];
+    }
+    function speakItems(items, interrupt) {
+        items.forEach(function (it, n) { speak(it.text, it.audio, n === 0 ? interrupt : false); });
+    }
+    function nextItems(st) {
+        var short = shortName(st), raw = rawTmpl("next");
+        if (st.audio_next) return [{ text: renderTmpl(raw, short), audio: st.audio_next }];
+        return speechItems(raw, short, st.audio_name);
+    }
+    // Arrival items for stop i: the final stop gets the last-stop message.
+    function arrivalItems(i) {
+        var st = S.stops[i], last = i === S.stops.length - 1;
+        var kind = last ? "last" : "here";
+        var full = last ? (st.audio_last || st.audio_here) : st.audio_here;
+        if (full) return [{ text: renderTmpl(rawTmpl(kind), shortName(st)), audio: full }];
+        return speechItems(rawTmpl(kind), shortName(st), st.audio_name);
     }
 
     /* ---------- Piper local-AI TTS (Bus Audio Studio pipeline) ----------
@@ -179,6 +223,33 @@
         }).catch(function () {
             $("ns-piperstate").textContent = "Piper status unavailable.";
         });
+    }
+    $("ns-gtmpl-save").addEventListener("click", function () {
+        var body = {
+            next: ($("ns-gtmpl-next") || {}).value || "",
+            here: ($("ns-gtmpl-here") || {}).value || "",
+            last: ($("ns-gtmpl-last") || {}).value || ""
+        };
+        $("ns-gtmpl-state").textContent = "Saving…";
+        fetch("/api/tts/templates", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+            .then(function (res) {
+                if (!res.ok) throw new Error(res.j.error || "failed");
+                G.templates = res.j.templates || {};
+                $("ns-gtmpl-state").textContent = "Global wording saved — services without their own override now use it.";
+                // Re-merge into the loaded service so empty overrides pick it up.
+                if (fileEl.value) loadServiceFile(fileEl.value);
+            }).catch(function (e) { $("ns-gtmpl-state").textContent = "Save failed: " + e.message; });
+    });
+    function loadGlobalTemplates() {
+        return fetch("/api/tts/templates").then(function (r) { return r.json(); }).then(function (g) {
+            if (g && !g.error) {
+                G.templates = g;
+                $("ns-gtmpl-next").value = g.next || "";
+                $("ns-gtmpl-here").value = g.here || "";
+                $("ns-gtmpl-last").value = g.last || "";
+            }
+        }).catch(function () { /* built-in defaults stand in */ });
     }
     $("ns-pregen").addEventListener("click", function () {
         var svc = fileEl.value;
@@ -264,10 +335,9 @@
         render(currentRoute(), currentDest());
         if (!S.announcedHere[key]) {
             S.announcedHere[key] = true;
-            var st = S.stops[i];
-            var a = arrivalSpeech(i);
-            speak(a.text, a.audio);
-            footerEl.textContent = (manual ? "Testing stop " : "Arrived: ") + st.name + (st.sub ? " — " + st.sub : "") + (i === S.stops.length - 1 ? " (last stop)." : ".");
+            if (manual) S.awaitPreview = true; // Next press previews what's next
+            speakItems(arrivalItems(i), true);
+            footerEl.textContent = (manual ? "Testing stop " : "Arrived: ") + S.stops[i].name + (S.stops[i].sub ? " — " + S.stops[i].sub : "") + (i === S.stops.length - 1 ? " (last stop)." : ".");
         }
     }
 
@@ -277,7 +347,7 @@
         var key = i + ":" + st.name;
         if (S.announcedNext[key]) return;
         S.announcedNext[key] = true;
-        speak(nextText(st), st.audio_next);
+        speakItems(nextItems(st), true);
     }
 
     function currentRoute() {
@@ -299,7 +369,9 @@
             S.routeNum = svc.route_number || "";
             S.destLabel = svc.destination || destEl.value;
             S.stops = svc.stops || [];
-            S.templates = svc.announce_templates || {};
+            // Service override wins over the global wording (empty = global).
+            S.templates = Object.assign({}, TMPL_DEFAULTS, G.templates,
+                                        svc.announce_templates || {});
             S.trig = svc.trigger_radius_m; S.appr = svc.approach_radius_m;
             S.idx = -1; S.announcedHere = {}; S.announcedNext = {};
             render(S.routeNum, S.destLabel);
@@ -409,29 +481,42 @@
         S.running = false; render(S.routeNum, S.destLabel);
         footerEl.textContent = "Route stopped.";
         stopAudio();
+        speakQueue = []; speakGen++; speakingItem = null; needGap = false;
         voiceActive = false; // abandon the tail, not mid-word: no chop click
         try { speechSynthesis.cancel(); } catch (e) { }
     });
-    $("ns-next").addEventListener("click", function () {
+    // One Next button, alternating: preview A, arrival A, preview B,
+    // arrival B... Each press speaks one thing; previews never advance
+    // the timeline (the following press arrives there).
+    function onNext() {
         if (!S.stops.length) return;
         S.running = true;
-        // Arrival only: firing the "next stop" warning and the arrival in
-        // the same tick chops the first utterance (audible click).
-        arriveAt(Math.min(S.stops.length - 1, S.idx + 1), true);
-    });
+        var nxt = S.idx + 1;
+        if (S.awaitPreview && nxt < S.stops.length) {
+            S.awaitPreview = false;
+            // Mark it announced so a later GPS approach doesn't repeat it;
+            // Hear next still replays on demand (it bypasses the dedup).
+            S.announcedNext[nxt + ":" + S.stops[nxt].name] = true;
+            speakItems(nextItems(S.stops[nxt]), true);
+            footerEl.textContent = "Next stop: " + S.stops[nxt].name + " — press Next on arrival.";
+        } else {
+            S.awaitPreview = true;
+            arriveAt(Math.min(S.stops.length - 1, S.idx + 1), true);
+        }
+    }
+    $("ns-next").addEventListener("click", onNext);
     $("ns-prev").addEventListener("click", function () {
         if (!S.stops.length) return;
         arriveAt(Math.max(0, S.idx - 1), true);
     });
     $("ns-say-next").addEventListener("click", function () {
         var n = S.stops[Math.min(S.stops.length - 1, S.idx + 1)] || S.stops[0];
-        if (n) speak(nextText(n), n.audio_next);
+        if (n) speakItems(nextItems(n), true);
     });
     $("ns-say-here").addEventListener("click", function () {
         var i = S.idx >= 0 ? S.idx : 0;
         if (!S.stops[i]) return;
-        var a = arrivalSpeech(i);
-        speak(a.text, a.audio);
+        speakItems(arrivalItems(i), true);
     });
 
     /* ---------- GPS ---------- */
@@ -480,7 +565,7 @@
 
     /* ---------- service file editor ---------- */
     function stopRow(s, i) {
-        var FIELDS = ["name", "sub", "lat", "lon", "approach_m", "radius_m", "announce_next", "announce_here", "announce_last", "audio_next", "audio_here", "audio_last"];
+        var FIELDS = ["name", "sub", "lat", "lon", "approach_m", "radius_m", "audio_next", "audio_here", "audio_last", "audio_name"];
         var d = document.createElement("div");
         d.className = "ns-stop-card";
         d.innerHTML =
@@ -491,12 +576,10 @@
             '<input type="number" data-k="lon" step="0.000001" placeholder="lon" value="">' +
             '<input type="number" data-k="approach_m" placeholder="approach m" value="">' +
             '<input type="number" data-k="radius_m" placeholder="arrival m" value="">' +
-            '<input type="text" class="full" data-k="announce_next" placeholder="Next-stop announcement (optional)" value="">' +
-            '<input type="text" class="full" data-k="announce_here" placeholder="Arrival announcement (optional)" value="">' +
-            '<input type="text" class="full" data-k="announce_last" placeholder="Last-stop message (final stop only)" value="">' +
             '<input type="text" data-k="audio_next" placeholder="audio_next (audio/x.mp3)" value="">' +
             '<input type="text" data-k="audio_here" placeholder="audio_here (audio/x.mp3)" value="">' +
             '<input type="text" data-k="audio_last" placeholder="audio_last (final stop)" value="">' +
+            '<input type="text" data-k="audio_name" placeholder="audio_name (stop name clip)" value="">' +
             '</div><div class="ns-row" style="margin-top:.4rem">' +
             '<button class="tbtn" data-act="gps" type="button">Use GPS</button>' +
             '<button class="tbtn" data-act="del" type="button">Remove</button></div>';
@@ -521,11 +604,15 @@
             '<input type="text" id="ns-meta-origin" placeholder="Origin" value="">' +
             '<input type="number" id="ns-meta-appr" placeholder="approach default" value="">' +
             '<input type="number" id="ns-meta-trig" placeholder="arrival default" value="">' +
-            '<input type="text" class="full" id="ns-tmpl-next" placeholder="Approach: Next stop, {stop}" value="">' +
-            '<input type="text" class="full" id="ns-tmpl-here" placeholder="Arrival: {stop}" value="">' +
-            '<input type="text" class="full" id="ns-tmpl-last" placeholder="Final stop: This is our last stop, {stop}" value=""></div>' +
-            '<p class="muted small" style="margin:.3rem 0 0">{stop} = stop name. Per-stop announcements below override these.</p>';
+            '<input type="text" class="full" id="ns-tmpl-next" placeholder="Next stop, {stop}" value="">' +
+            '<input type="text" class="full" id="ns-tmpl-here" placeholder="We are now approaching, {stop}" value="">' +
+            '<input type="text" class="full" id="ns-tmpl-last" placeholder="This is our final stop, {stop}" value=""></div>' +
+            '<p class="muted small" style="margin:.3rem 0 0">Service override — {stop} = stop name. Leave empty to use the global wording.</p>';
         editorEl.appendChild(meta);
+        // Placeholders show the global values actually in effect.
+        $("ns-tmpl-next").placeholder = (G.templates || {}).next || TMPL_DEFAULTS.next;
+        $("ns-tmpl-here").placeholder = (G.templates || {}).here || TMPL_DEFAULTS.here;
+        $("ns-tmpl-last").placeholder = (G.templates || {}).last || TMPL_DEFAULTS.last;
         if (svc) {
             $("ns-meta-route").value = svc.route_number || "";
             $("ns-meta-dest").value = svc.destination || "";
@@ -552,10 +639,8 @@
                 lat: parseFloat(v("lat")), lon: parseFloat(v("lon")),
                 approach_m: parseInt(v("approach_m")) || 250,
                 radius_m: parseInt(v("radius_m")) || 60,
-                announce_next: v("announce_next"), announce_here: v("announce_here"),
-                announce_last: v("announce_last"),
                 audio_next: v("audio_next"), audio_here: v("audio_here"),
-                audio_last: v("audio_last")
+                audio_last: v("audio_last"), audio_name: v("audio_name")
             });
         });
         var body = {
@@ -605,6 +690,7 @@
         $("ns-audiolist").innerHTML = files.length ? ("Drop MP3s in <code>audio/</code>:<br>" + files.map(function (f) { return "<code>" + f.path + "</code>"; }).join("<br>")) : "No premade audio yet — drop MP3s in <code>audio/</code>.";
     }).catch(function () { $("ns-audiolist").textContent = "Audio list unavailable."; });
     refreshPiper();
+    loadGlobalTemplates();
 
     fetch("/api/programs").then(function (r) { return r.json(); }).then(function (names) {
         if (!names.length) { fill(progEl, [], "No programs"); return; }

@@ -12,10 +12,9 @@
       "lon": -1.6311792694469847,
       "radius_m": 60,
       "approach_m": 250,
-      "announce_next": "",
-      "announce_here": "",
       "audio_next": "",
-      "audio_here": ""
+      "audio_here": "",
+      "audio_last": ""
     },
     {
       "name": "Adjacent to The Lord Burton",
@@ -24,10 +23,9 @@
       "lon": -1.6297113804880679,
       "radius_m": 60,
       "approach_m": 250,
-      "announce_next": "",
-      "announce_here": "",
       "audio_next": "",
-      "audio_here": ""
+      "audio_here": "",
+      "audio_last": ""
     },
     {
       "name": "Opposite Meadowside Drive",
@@ -36,10 +34,9 @@
       "lon": -1.6276306878153521,
       "radius_m": 60,
       "approach_m": 250,
-      "announce_next": "",
-      "announce_here": "",
       "audio_next": "",
-      "audio_here": ""
+      "audio_here": "",
+      "audio_last": ""
     },
     {
       "name": "Opposite Bargates",
@@ -48,10 +45,9 @@
       "lon": -1.6265815753562578,
       "radius_m": 60,
       "approach_m": 250,
-      "announce_next": "",
-      "announce_here": "",
       "audio_next": "",
-      "audio_here": ""
+      "audio_here": "",
+      "audio_last": ""
     },
     {
       "name": "Adjacent to Holy Trinity School",
@@ -60,10 +56,9 @@
       "lon": -1.6260804595397331,
       "radius_m": 60,
       "approach_m": 250,
-      "announce_next": "",
-      "announce_here": "",
       "audio_next": "",
-      "audio_here": ""
+      "audio_here": "",
+      "audio_last": ""
     },
     {
       "name": "Adjacent to Bus Garage",
@@ -72,10 +67,9 @@
       "lon": -1.6258719799766532,
       "radius_m": 60,
       "approach_m": 250,
-      "announce_next": "",
-      "announce_here": "",
       "audio_next": "",
-      "audio_here": ""
+      "audio_here": "",
+      "audio_last": ""
     },
     {
       "name": "Adjacent to Northside Business Park",
@@ -84,10 +78,9 @@
       "lon": -1.6256384395282426,
       "radius_m": 60,
       "approach_m": 250,
-      "announce_next": "",
-      "announce_here": "",
       "audio_next": "",
-      "audio_here": ""
+      "audio_here": "",
+      "audio_last": ""
     },
     {
       "name": "Adjacent to Pirelli Sports Club",
@@ -96,10 +89,9 @@
       "lon": -1.625233420236549,
       "radius_m": 60,
       "approach_m": 250,
-      "announce_next": "",
-      "announce_here": "",
       "audio_next": "",
-      "audio_here": ""
+      "audio_here": "",
+      "audio_last": ""
     },
     {
       "name": "Adjacent to Battista Road",
@@ -108,10 +100,9 @@
       "lon": -1.6222003700854812,
       "radius_m": 60,
       "approach_m": 250,
-      "announce_next": "",
-      "announce_here": "",
       "audio_next": "",
-      "audio_here": ""
+      "audio_here": "",
+      "audio_last": ""
     },
     {
       "name": "Opposite Meadow Lane",
@@ -120,10 +111,9 @@
       "lon": -1.6140296732831585,
       "radius_m": 60,
       "approach_m": 250,
-      "announce_next": "",
-      "announce_here": "",
       "audio_next": "",
-      "audio_here": ""
+      "audio_here": "",
+      "audio_last": ""
     },
     {
       "name": "Near Mill Stream Lane",
@@ -132,10 +122,9 @@
       "lon": -1.6132275470467403,
       "radius_m": 60,
       "approach_m": 250,
-      "announce_next": "",
-      "announce_here": "",
       "audio_next": "",
-      "audio_here": ""
+      "audio_here": "",
+      "audio_last": ""
     },
     {
       "name": "Royal Derby Hospital (Opp)",
@@ -144,10 +133,9 @@
       "lon": -1.513503104357862,
       "radius_m": 60,
       "approach_m": 250,
-      "announce_next": "",
-      "announce_here": "",
       "audio_next": "",
-      "audio_here": ""
+      "audio_here": "",
+      "audio_last": ""
     },
     {
       "name": "Royal Derby Hospital Ring Road (just before)",
@@ -156,10 +144,9 @@
       "lon": -1.510128641333531,
       "radius_m": 60,
       "approach_m": 250,
-      "announce_next": "",
-      "announce_here": "",
       "audio_next": "",
-      "audio_here": ""
+      "audio_here": "",
+      "audio_last": ""
     },
     {
       "name": "Opposite Manor Road",
@@ -168,10 +155,9 @@
       "lon": -1.5073938343309885,
       "radius_m": 60,
       "approach_m": 250,
-      "announce_next": "",
-      "announce_here": "",
       "audio_next": "",
-      "audio_here": ""
+      "audio_here": "",
+      "audio_last": ""
     },
     {
       "name": "Adjacent to Albany Road",
@@ -180,10 +166,9 @@
       "lon": -1.5043456637418964,
       "radius_m": 60,
       "approach_m": 250,
-      "announce_next": "",
-      "announce_here": "",
       "audio_next": "",
-      "audio_here": ""
+      "audio_here": "",
+      "audio_last": ""
     },
     {
       "name": "Adjacent to The Rowditch",
@@ -192,10 +177,9 @@
       "lon": -1.4993250598548804,
       "radius_m": 60,
       "approach_m": 250,
-      "announce_next": "",
-      "announce_here": "",
       "audio_next": "",
-      "audio_here": ""
+      "audio_here": "",
+      "audio_last": ""
     },
     {
       "name": "Opposite Boundary Road",
@@ -204,10 +188,9 @@
       "lon": -1.4947621803469338,
       "radius_m": 60,
       "approach_m": 250,
-      "announce_next": "",
-      "announce_here": "",
       "audio_next": "",
-      "audio_here": ""
+      "audio_here": "",
+      "audio_last": ""
     },
     {
       "name": "Adjacent to Great Northern Road",
@@ -216,10 +199,9 @@
       "lon": -1.4877070165064576,
       "radius_m": 60,
       "approach_m": 250,
-      "announce_next": "",
-      "announce_here": "",
       "audio_next": "",
-      "audio_here": ""
+      "audio_here": "",
+      "audio_last": ""
     },
     {
       "name": "Derby Bold Lane Car Park (B6)",
@@ -228,10 +210,9 @@
       "lon": -1.4805079727057402,
       "radius_m": 60,
       "approach_m": 250,
-      "announce_next": "",
-      "announce_here": "",
       "audio_next": "",
-      "audio_here": ""
+      "audio_here": "",
+      "audio_last": ""
     },
     {
       "name": "Adjacent to Bold Lane Car Park",
@@ -240,10 +221,9 @@
       "lon": -1.480726990371876,
       "radius_m": 60,
       "approach_m": 250,
-      "announce_next": "",
-      "announce_here": "",
       "audio_next": "",
-      "audio_here": ""
+      "audio_here": "",
+      "audio_last": ""
     },
     {
       "name": "Adjacent to Queen's Leisure Centre",
@@ -252,10 +232,9 @@
       "lon": -1.4795349514170177,
       "radius_m": 60,
       "approach_m": 250,
-      "announce_next": "",
-      "announce_here": "",
       "audio_next": "",
-      "audio_here": ""
+      "audio_here": "",
+      "audio_last": ""
     },
     {
       "name": "Derby Full Street (Stop C4)",
@@ -264,10 +243,9 @@
       "lon": -1.4757094840824885,
       "radius_m": 60,
       "approach_m": 250,
-      "announce_next": "",
-      "announce_here": "",
       "audio_next": "",
-      "audio_here": ""
+      "audio_here": "",
+      "audio_last": ""
     },
     {
       "name": "Derby Morledge (Stop L1)",
@@ -276,10 +254,9 @@
       "lon": -1.47380225934779,
       "radius_m": 60,
       "approach_m": 250,
-      "announce_next": "",
-      "announce_here": "",
       "audio_next": "",
-      "audio_here": ""
+      "audio_here": "",
+      "audio_last": ""
     },
     {
       "name": "Derby Bus Station (Bay 11)",
@@ -288,10 +265,9 @@
       "lon": -1.4716765163084093,
       "radius_m": 60,
       "approach_m": 250,
-      "announce_next": "",
-      "announce_here": "",
       "audio_next": "",
-      "audio_here": ""
+      "audio_here": "",
+      "audio_last": ""
     }
   ]
 }

@@ -154,9 +154,10 @@ route number + destination + time on top, stop timeline below with the
 current stop ringed in yellow. While a route runs, **Start** also pushes
 the destination to the LED board, which keeps looping it as normal.
 
-* **Testing:** Prev/Next buttons or click any stop to jump to it.
-  Each jump speaks the arrival; stepping forward also speaks the
-  "next stop" warning. Hear next / Hear arrival replay them.
+* **Testing:** Prev/Next buttons or click any stop to jump to it. The
+  Next button alternates preview then arrival (next stop A, arriving A,
+  next stop B…) — each press speaks one thing. Hear next / Hear arrival
+  replay them.
 * **IRL:** enable GPS auto-advance — browser geolocation watches your
   position and fires *approach* ("Next stop, …") at `approach_m` metres
   and *arrival* ("…") inside `radius_m` metres, advancing the timeline.
@@ -179,11 +180,12 @@ the destination to the LED board, which keeps looping it as normal.
   `.dest` via `POST /api/nextstop/link`, or hand-edit. API:
   `GET/POST /api/nextstop/services`, `GET/PUT/DELETE
   /api/nextstop/services/<name>`, `POST /api/nextstop/link`,
-  `GET /api/audio` (+ `/audio/<path>` static). The service-wide wording
-  is configurable per file (`announce_templates.next/here/last`, with a
-  `{stop}` slot — e.g. approach `"We are now approaching, {stop}"`,
-  arrival `"{stop}"`, final stop `"This is our final stop"`); per-stop
-  `announce_next/here/last` still overrides it.
+  `GET /api/audio` (+ `/audio/<path>` static). The wording is one
+  global set reused for every stop (`Announcement wording` on the page:
+  `Next stop, {stop}` / `We are now approaching, {stop}` /
+  `This is our final stop`), with an optional per-service override in
+  the service file's own settings. No per-stop wording — every stop in
+  a service announces the same way.
 
 ### Live preview from Sign Studio
 

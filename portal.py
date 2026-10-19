@@ -32,6 +32,8 @@ Routes:
                                        nextstop_service} ("" to unlink)
     /api/audio                        -> GET list of premade announcement files
     /api/tts/voices                  -> GET Piper voices + engine status
+    /api/tts/templates               -> GET/PUT global announcement
+                                       wording {next,here,last}
     /api/tts                           -> POST {text,voice?} live synthesis
                                        (cached WAV, 4xx/5xx = use browser TTS)
     /api/tts/generate                  -> POST {service,voice?,workers?}
@@ -246,6 +248,10 @@ class BoardHandler(SimpleHTTPRequestHandler):
             return self._serve_json(api.list_audio_files(ROOT))
         if url_path in ("/api/nextstop/services", "/api/nextstop/services/"):
             return self._serve_json(api.list_nextstop_services(ROOT))
+        # Local-AI TTS (Piper) global wording: the default next/here/last
+        # templates every service inherits unless it overrides them.
+        if url_path in ("/api/tts/templates", "/api/tts/templates/"):
+            return self._serve_json(api.get_global_announce_templates(ROOT))
         # Local-AI TTS voices (Piper): availability + .onnx list.
         if url_path in ("/api/tts/voices", "/api/tts/voices/"):
             words, _ = api.load_tts_words(ROOT)
@@ -277,6 +283,19 @@ class BoardHandler(SimpleHTTPRequestHandler):
         url_path = posixpath.normpath(parsed.path or "/")
         if parsed.path.endswith("/") and url_path != "/":
             url_path += "/"
+        # Save the global announcement wording: PUT {next?,here?,last?}.
+        if url_path in ("/api/tts/templates", "/api/tts/templates/"):
+            data, error = self._read_json_body()
+            if error:
+                return self._serve_json({"error": error}, status=400)
+            if not isinstance(data, dict):
+                return self._serve_json({"error": "body must be JSON"}, status=400)
+            ok, message = api.save_global_announce_templates(ROOT, data)
+            if not ok:
+                return self._serve_json({"error": message}, status=400)
+            return self._serve_json({"ok": True,
+                                     "templates": api.get_global_announce_templates(ROOT)})
+
         # Save (overwrite) a .service next-stop file.
         if url_path.startswith("/api/nextstop/services/"):
             name = urllib.parse.unquote(
