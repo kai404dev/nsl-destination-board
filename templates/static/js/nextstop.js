@@ -13,7 +13,7 @@
     var gpsState = $("ns-gpsstate");
 
     var progCache = {};
-    var S = { stops: [], idx: -1, running: false, announcedHere: {}, announcedNext: {} };
+    var S = { stops: [], idx: -1, running: false, announcedHere: {}, announcedNext: {}, templates: {} };
     var watchId = null, lastPos = null;
     var NS_WINDOW = 3; // display shows current stop + next two only
 
@@ -131,9 +131,16 @@
         }
         browserSpeak(text);
     }
-    function nextText(s) { return s.announce_next || ("Next stop, " + shortName(s)); }
-    function hereText(s) { return s.announce_here || shortName(s); }
-    function lastText(s) { return s.announce_last || ("This is our last stop, " + shortName(s)); }
+    var TMPL_DEFAULTS = { next: "Next stop, {stop}", here: "{stop}", last: "This is our last stop, {stop}" };
+    // Service-wide wording: {stop} = the stop's short name. Per-stop
+    // announce_next/here/last (below) still win over these templates.
+    function tmpl(kind, short) {
+        var t = (S.templates || {})[kind] || TMPL_DEFAULTS[kind];
+        return String(t).replace(/\{stop\}/gi, short);
+    }
+    function nextText(s) { return s.announce_next || tmpl("next", shortName(s)); }
+    function hereText(s) { return s.announce_here || tmpl("here", shortName(s)); }
+    function lastText(s) { return s.announce_last || tmpl("last", shortName(s)); }
     // Arrival speech for stop i: the final stop gets the last-stop message.
     function arrivalSpeech(i) {
         var st = S.stops[i];
@@ -292,6 +299,7 @@
             S.routeNum = svc.route_number || "";
             S.destLabel = svc.destination || destEl.value;
             S.stops = svc.stops || [];
+            S.templates = svc.announce_templates || {};
             S.trig = svc.trigger_radius_m; S.appr = svc.approach_radius_m;
             S.idx = -1; S.announcedHere = {}; S.announcedNext = {};
             render(S.routeNum, S.destLabel);
@@ -512,7 +520,11 @@
             '<input type="text" id="ns-meta-dest" placeholder="Destination" value="">' +
             '<input type="text" id="ns-meta-origin" placeholder="Origin" value="">' +
             '<input type="number" id="ns-meta-appr" placeholder="approach default" value="">' +
-            '<input type="number" id="ns-meta-trig" placeholder="arrival default" value=""></div>';
+            '<input type="number" id="ns-meta-trig" placeholder="arrival default" value="">' +
+            '<input type="text" class="full" id="ns-tmpl-next" placeholder="Approach: Next stop, {stop}" value="">' +
+            '<input type="text" class="full" id="ns-tmpl-here" placeholder="Arrival: {stop}" value="">' +
+            '<input type="text" class="full" id="ns-tmpl-last" placeholder="Final stop: This is our last stop, {stop}" value=""></div>' +
+            '<p class="muted small" style="margin:.3rem 0 0">{stop} = stop name. Per-stop announcements below override these.</p>';
         editorEl.appendChild(meta);
         if (svc) {
             $("ns-meta-route").value = svc.route_number || "";
@@ -520,6 +532,10 @@
             $("ns-meta-origin").value = svc.origin || "";
             $("ns-meta-appr").value = svc.approach_radius_m || 250;
             $("ns-meta-trig").value = svc.trigger_radius_m || 60;
+            var tm = svc.announce_templates || {};
+            $("ns-tmpl-next").value = tm.next || "";
+            $("ns-tmpl-here").value = tm.here || "";
+            $("ns-tmpl-last").value = tm.last || "";
             (svc.stops || []).forEach(function (s) { editorEl.appendChild(stopRow(s)); });
         }
     }
@@ -548,6 +564,11 @@
             origin: ($("ns-meta-origin") || {}).value || "",
             approach_radius_m: parseInt(($("ns-meta-appr") || {}).value) || 250,
             trigger_radius_m: parseInt(($("ns-meta-trig") || {}).value) || 60,
+            announce_templates: {
+                next: (($("ns-tmpl-next") || {}).value || "").trim(),
+                here: (($("ns-tmpl-here") || {}).value || "").trim(),
+                last: (($("ns-tmpl-last") || {}).value || "").trim()
+            },
             stops: stops
         };
         sayStatus("Saving…");

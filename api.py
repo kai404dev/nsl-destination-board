@@ -1171,19 +1171,51 @@ def delete_bitmap(root: Path, rel: str) -> tuple[bool, str]:
 #     {"route_number": "83",
 #      "destination": "Lower Hutt - Queensgate",
 #      "trigger_radius_m": 60, "approach_radius_m": 250,
+#      "announce_templates": {"next": "Next stop, {stop}",
+#                             "here": "{stop}",
+#                             "last": "This is our last stop, {stop}"},
 #      "stops": [{"name": ..., "sub": ..., "lat": -41.27, "lon": 174.78,
 #                 "radius_m": 60, "approach_m": 250,
 #                 "announce_next": "...", "announce_here": "...",
 #                 "audio_next": "audio/x.mp3", "audio_here": ""}]}
 #
-# ``announce_*`` fall back to auto text ("Next stop, <name>" /
-# "<name>[, <sub>]"). ``audio_*`` are optional repo-relative paths under
-# ``audio/`` - when set the browser plays the file instead of TTS, which
-# is also the hook for pre-made or local-AI voices.
+# ``announce_templates`` holds the service-wide wording: ``next`` fires at
+# the approach radius, ``here`` on arrival, ``last`` on final-stop
+# arrival. ``{stop}`` (any case) is replaced with the stop's short name;
+# a template without the slot is used literally for every stop. Missing
+# keys fall back to the defaults above. A per-stop ``announce_next`` /
+# ``announce_here`` / ``announce_last`` still wins over its template.
+# ``audio_*`` are optional repo-relative paths under ``audio/`` - when
+# set the browser plays the file instead of TTS, which is also the hook
+# for pre-made or local-AI voices.
 # ---------------------------------------------------------------------------
 
 SERVICE_FILE_RE = re.compile(r"[A-Za-z0-9_-]+")
 SERVICES_DIR_NAME = "services"
+
+# Service-wide announcement wording. {stop} = the stop's short name.
+ANNOUNCE_TEMPLATE_DEFAULTS = {
+    "next": "Next stop, {stop}",
+    "here": "{stop}",
+    "last": "This is our last stop, {stop}",
+}
+
+
+def clean_announce_templates(raw) -> dict:
+    """Coerce raw templates to {next, here, last}, filling defaults."""
+    if not isinstance(raw, dict):
+        raw = {}
+    out = {}
+    for key in ("next", "here", "last"):
+        t = str(raw.get(key) or "").strip()[:500]
+        out[key] = t or ANNOUNCE_TEMPLATE_DEFAULTS[key]
+    return out
+
+
+def render_announcement(template: str, short: str) -> str:
+    """Fill an announcement template's ``{stop}`` slot (any case)."""
+    return re.sub(r"\{stop\}", str(short or ""), str(template or ""),
+                  flags=re.IGNORECASE)
 
 AUDIO_DIR_NAME = "audio"
 AUDIO_ALLOWED_EXTS = {".mp3", ".wav", ".ogg", ".m4a", ".flac"}
@@ -1294,6 +1326,8 @@ def sanitise_service(data: dict) -> dict | None:
         "destination": str(data.get("destination") or "").strip()[:160],
         "trigger_radius_m": _radius(data.get("trigger_radius_m", 60), 60),
         "approach_radius_m": _radius(data.get("approach_radius_m", 250), 250),
+        "announce_templates": clean_announce_templates(
+            data.get("announce_templates")),
         "stops": clean_stops,
     }
 
@@ -1685,10 +1719,10 @@ def pregen_service_tts(root: Path, service_name: str,
                         max_workers: int | None = None) -> tuple[bool, dict]:
     """Pre-bake every announcement line for a .service file.
 
-    Synthesises each stop's approach ("Next stop, <short>") and arrival
-    ("<short>") lines so the page's live /api/tts calls hit cache IRL.
-    Lines synthesise in parallel (one piper process per worker) - on a
-    4-core Pi this is ~4x faster than the old sequential loop.
+    Synthesises each stop's approach and arrival lines (per the service's
+    ``announce_templates``) so the page's live /api/tts calls hit cache
+    IRL. Lines synthesise in parallel (one piper process per worker) - on
+    a 4-core Pi this is ~4x faster than the old sequential loop.
     Returns (ok, {voice, total, generated, cached, workers, texts} | error).
     """
     import concurrent.futures as _futures
@@ -1698,18 +1732,23 @@ def pregen_service_tts(root: Path, service_name: str,
     svc = load_nextstop_service(_P(root), service_name or "")
     if svc is None:
         return False, {"error": "next-stop service not found"}
+    templates = clean_announce_templates(svc.get("announce_templates"))
     texts: list[str] = []
     last_idx = len(svc.get("stops") or []) - 1
     for n, stop in enumerate(svc.get("stops") or []):
         short = short_stop_name((stop or {}).get("name", ""))
         if not short:
             continue
-        lines = [f"Next stop, {short}"]
+        # Same lines the page speaks (per-stop overrides win over the
+        # service templates), so pre-baked cache hits match live requests.
+        lines = [(stop or {}).get("announce_next")
+                 or render_announcement(templates["next"], short)]
         if n == last_idx:
             lines.append((stop or {}).get("announce_last")
-                         or f"This is our last stop, {short}")
+                         or render_announcement(templates["last"], short))
         else:
-            lines.append(short)
+            lines.append((stop or {}).get("announce_here")
+                         or render_announcement(templates["here"], short))
         for line in lines:
             if line not in texts:
                 texts.append(line)

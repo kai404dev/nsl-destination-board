@@ -179,7 +179,11 @@ the destination to the LED board, which keeps looping it as normal.
   `.dest` via `POST /api/nextstop/link`, or hand-edit. API:
   `GET/POST /api/nextstop/services`, `GET/PUT/DELETE
   /api/nextstop/services/<name>`, `POST /api/nextstop/link`,
-  `GET /api/audio` (+ `/audio/<path>` static).
+  `GET /api/audio` (+ `/audio/<path>` static). The service-wide wording
+  is configurable per file (`announce_templates.next/here/last`, with a
+  `{stop}` slot — e.g. approach `"We are now approaching, {stop}"`,
+  arrival `"{stop}"`, final stop `"This is our final stop"`); per-stop
+  `announce_next/here/last` still overrides it.
 
 ### Live preview from Sign Studio
 
