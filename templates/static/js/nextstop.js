@@ -183,7 +183,7 @@
             .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
             .then(function (res) {
                 if (!res.ok) throw new Error(res.j.error || "failed");
-                $("ns-piperstate").textContent = "Baked " + res.j.total + " lines for " + svc + " (" + res.j.voice.replace(/\.onnx$/, "") + ": " + res.j.generated + " new, " + res.j.cached + " cached).";
+                $("ns-piperstate").textContent = "Baked " + res.j.total + " lines for " + svc + " (" + res.j.voice.replace(/\.onnx$/, "") + ": " + res.j.generated + " new, " + res.j.cached + " cached" + (res.j.workers > 1 ? ", " + res.j.workers + "x parallel" : "") + ").";
             })
             .catch(function (e) { $("ns-piperstate").textContent = "Pre-bake failed: " + e.message; })
             .then(function () { btn.disabled = false; });

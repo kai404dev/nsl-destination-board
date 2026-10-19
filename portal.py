@@ -34,8 +34,8 @@ Routes:
     /api/tts/voices                  -> GET Piper voices + engine status
     /api/tts                           -> POST {text,voice?} live synthesis
                                        (cached WAV, 4xx/5xx = use browser TTS)
-    /api/tts/generate                  -> POST {service,voice?} pre-bake a
-                                       service's announcement lines
+    /api/tts/generate                  -> POST {service,voice?,workers?}
+                                         pre-bake a service's lines (parallel)
     /audio/<path>                     -> raw announcement audio files
     /fonts/<path>                     -> raw BDF font files (canvas preview)
 """
@@ -450,8 +450,10 @@ class BoardHandler(SimpleHTTPRequestHandler):
             return self._serve_json({"ok": True})
 
         # Pre-bake every announcement line for a service: POST
-        # {"service": "<name>", "voice"?}. Warms the live cache below so
-        # GPS-triggered lines play instantly IRL.
+        # {"service": "<name>", "voice"?, "workers"?}. Warms the live cache
+        # below so GPS-triggered lines play instantly IRL. Lines bake in
+        # parallel (default: CPU count, max 8) - pass workers: 1 for the
+        # old sequential behaviour, or 2..16 to tune Pi memory use.
         if url_path in ("/api/tts/generate", "/api/tts/generate/"):
             data, error = self._read_json_body()
             if error:
@@ -460,7 +462,8 @@ class BoardHandler(SimpleHTTPRequestHandler):
                 return self._serve_json({"error": "body must be JSON"}, status=400)
             ok, result = api.pregen_service_tts(
                 ROOT, str(data.get("service") or ""),
-                str(data.get("voice") or "") or None)
+                str(data.get("voice") or "") or None,
+                data.get("workers", data.get("jobs")))
             if not ok:
                 return self._serve_json(
                     {"error": result.get("error", "failed")}, status=400)

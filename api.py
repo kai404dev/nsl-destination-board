@@ -1460,6 +1460,10 @@ TTS_VOICES_DIR_NAME = "voices"
 TTS_CACHE_SUBDIR = "tts/cache"
 TTS_MAX_CHARS = 500
 TTS_TIMEOUT_SECONDS = 120
+# Parallel pre-bake: None = auto (CPU count, capped so a Pi 4 runs ~4
+# piper processes without OOM). Overridable per request via
+# POST /api/tts/generate {"workers": N}.
+TTS_MAX_WORKERS = 4
 
 
 def _tts_voices_dir(root: Path) -> Path:
@@ -1623,7 +1627,14 @@ def synthesize_tts(root: Path, text: str,
     voice_path = _tts_voices_dir(_P(root)) / v
     try:
         out.parent.mkdir(parents=True, exist_ok=True)
-        tmp = out.with_suffix(".wav.tmp")
+        # Unique tmp per synthesis so concurrent /api/tts hits (or
+        # parallel pre-bake workers) for the same line never truncate
+        # each other's output. Final rename is atomic.
+        import os as _os
+        import threading as _threading
+
+        tmp = out.with_suffix(
+            f".{_os.getpid()}-{_threading.get_ident()}.wav.tmp")
         proc = _subprocess.run(
             cmd + ["-m", str(voice_path), "-f", str(tmp)],
             input=clean.encode(), capture_output=True,
@@ -1634,7 +1645,21 @@ def synthesize_tts(root: Path, text: str,
         return False, f"cannot run piper: {exc}"
     if proc.returncode != 0 or not tmp.is_file():
         err = (proc.stderr or b"").decode(errors="replace")[-200:].strip()
+        try:
+            if tmp.is_file():
+                tmp.unlink()
+        except OSError:
+            pass
         return False, f"piper failed: {err or proc.returncode}"
+    # Another worker may have baked the same line while we ran (live
+    # duplicate hits share one cache path): skip the rename then, the
+    # bytes are identical for identical text+voice.
+    if out.is_file():
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+        return True, rel
     try:
         tmp.replace(out)
     except OSError as exc:
@@ -1642,14 +1667,32 @@ def synthesize_tts(root: Path, text: str,
     return True, rel
 
 
+def _tts_default_workers(n_items: int) -> int:
+    """Worker count for parallel pre-bake (at least 1, at most 8)."""
+    import os as _os
+
+    try:
+        cpu = _os.cpu_count() or TTS_MAX_WORKERS
+    except NotImplementedError:
+        cpu = TTS_MAX_WORKERS
+    # Pi 4/5 have 4 cores: 4 parallel pipers ≈ 4x faster. Cap at 8 so a
+    # big laptop doesn't spawn dozens of model loads and OOM.
+    return max(1, min(n_items, max(1, cpu), 8))
+
+
 def pregen_service_tts(root: Path, service_name: str,
-                        voice: str | None = None) -> tuple[bool, dict]:
+                        voice: str | None = None,
+                        max_workers: int | None = None) -> tuple[bool, dict]:
     """Pre-bake every announcement line for a .service file.
 
     Synthesises each stop's approach ("Next stop, <short>") and arrival
     ("<short>") lines so the page's live /api/tts calls hit cache IRL.
-    Returns (ok, {voice, total, generated, cached, texts} | error).
+    Lines synthesise in parallel (one piper process per worker) - on a
+    4-core Pi this is ~4x faster than the old sequential loop.
+    Returns (ok, {voice, total, generated, cached, workers, texts} | error).
     """
+    import concurrent.futures as _futures
+
     from pathlib import Path as _P
 
     svc = load_nextstop_service(_P(root), service_name or "")
@@ -1681,20 +1724,62 @@ def pregen_service_tts(root: Path, service_name: str,
     if not piper_available():
         return False, {"error": "piper not found (pip install piper-tts in the venv)"}
     words, replaces = load_tts_words(_P(root))
-    generated = cached = 0
-    for line in texts:
+    try:
+        workers = int(max_workers) if max_workers not in (None, "") else 0
+    except (TypeError, ValueError):
+        workers = 0
+    if workers <= 0:
+        workers = _tts_default_workers(len(texts))
+    workers = max(1, min(workers, len(texts), 16))
+    # Fast path: single worker requested (or a single line) stays
+    # sequential - same result, no thread pool overhead.
+    if len(texts) == 1 or workers == 1:
+        generated = cached = 0
+        for line in texts:
+            rel = _tts_cache_rel(v, clean_tts_text(line, words, replaces))
+            hit = (_P(root) / rel).is_file()
+            ok, msg = synthesize_tts(_P(root), line, v)
+            if not ok:
+                return False, {"error": msg, "voice": v, "total": len(texts),
+                               "generated": generated, "cached": cached,
+                               "workers": 1}
+            if hit:
+                cached += 1
+            else:
+                generated += 1
+        return True, {"voice": v, "total": len(texts),
+                      "generated": generated, "cached": cached,
+                      "workers": 1, "texts": texts}
+
+    def _one(line: str) -> tuple[str, bool, str, bool]:
         rel = _tts_cache_rel(v, clean_tts_text(line, words, replaces))
         hit = (_P(root) / rel).is_file()
-        ok, msg = synthesize_tts(_P(root), line, v)
-        if not ok:
-            return False, {"error": msg, "voice": v, "total": len(texts),
-                            "generated": generated, "cached": cached}
         if hit:
-            cached += 1
-        else:
-            generated += 1
+            return line, True, rel, True
+        ok, msg = synthesize_tts(_P(root), line, v)
+        return line, ok, msg, False
+
+    generated = cached = 0
+    with _futures.ThreadPoolExecutor(max_workers=workers,
+                                     thread_name_prefix="piper") as pool:
+        future_map = {pool.submit(_one, line): line for line in texts}
+        for fut in _futures.as_completed(future_map):
+            line, ok, msg, was_hit = fut.result()
+            if not ok:
+                # Cancel the rest: a real failure (bad voice, OOM) will
+                # fail them all, so stop spawning work immediately.
+                for pending in future_map:
+                    pending.cancel()
+                return False, {"error": msg, "voice": v, "total": len(texts),
+                               "generated": generated, "cached": cached,
+                               "workers": workers}
+            if was_hit:
+                cached += 1
+            else:
+                generated += 1
     return True, {"voice": v, "total": len(texts),
-                  "generated": generated, "cached": cached, "texts": texts}
+                  "generated": generated, "cached": cached,
+                  "workers": workers, "texts": texts}
 
 
 def sanitise_page_images(images) -> list[dict]:
