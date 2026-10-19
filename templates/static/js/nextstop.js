@@ -121,7 +121,7 @@
         if (!$("ns-tts").checked || !text) return;
         if (audioPath && audioPath.trim()) { playAudioThen(audioPath, text); return; }
         if ($("ns-localai").checked) {
-            fetch("/api/tts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: text }) })
+            fetch("/api/tts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: text, voice: piperVoice() }) })
                 .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
                 .then(function (res) {
                     if (res.ok && res.j && res.j.audio) playAudioThen(res.j.audio, text);
@@ -133,6 +133,54 @@
     }
     function nextText(s) { return s.announce_next || ("Next stop, " + shortName(s)); }
     function hereText(s) { return s.announce_here || shortName(s); }
+
+    /* ---------- Piper local-AI TTS (Bus Audio Studio pipeline) ----------
+       Voices + engine status from the portal; live lines are synthesised
+       server-side and cached, pre-bake warms the whole service at once. */
+    function piperVoice() {
+        var el = $("ns-piper-voice");
+        return (el && el.value) || "";
+    }
+    function refreshPiper() {
+        fetch("/api/tts/voices").then(function (r) { return r.json(); }).then(function (v) {
+            var sel = $("ns-piper-voice"), cur = sel.value;
+            sel.innerHTML = "";
+            (v.voices || []).forEach(function (name) {
+                var o = document.createElement("option");
+                o.value = name;
+                o.textContent = name.replace(/\.onnx$/, "");
+                sel.appendChild(o);
+            });
+            if (cur) sel.value = cur;
+            var st = $("ns-piperstate");
+            if (!v.piper && !(v.voices || []).length) {
+                st.textContent = "Piper not installed and no voices here — copy .onnx + JSONs to voices/ (see voices/README.md). Browser TTS in use.";
+            } else if (!v.piper) {
+                st.textContent = "Voices present but piper engine missing (pip install piper-tts + espeak-ng on the Pi). Browser TTS in use.";
+            } else if (!(v.voices || []).length) {
+                st.textContent = "Piper engine ready but no voices — copy .onnx files to voices/. Browser TTS in use.";
+            } else {
+                st.textContent = "Piper ready (" + v.voices.length + " voice" + (v.voices.length === 1 ? "" : "s") + ", " + v.custom_words + " custom pronunciations). Tick the box above to use it.";
+            }
+        }).catch(function () {
+            $("ns-piperstate").textContent = "Piper status unavailable.";
+        });
+    }
+    $("ns-pregen").addEventListener("click", function () {
+        var svc = fileEl.value;
+        if (!svc) { sayStatus("Pick a service file first."); return; }
+        var btn = $("ns-pregen");
+        btn.disabled = true;
+        $("ns-piperstate").textContent = "Synthesising " + svc + "… (first run takes a while)";
+        fetch("/api/tts/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ service: svc, voice: piperVoice() }) })
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+            .then(function (res) {
+                if (!res.ok) throw new Error(res.j.error || "failed");
+                $("ns-piperstate").textContent = "Baked " + res.j.total + " lines for " + svc + " (" + res.j.voice.replace(/\.onnx$/, "") + ": " + res.j.generated + " new, " + res.j.cached + " cached).";
+            })
+            .catch(function (e) { $("ns-piperstate").textContent = "Pre-bake failed: " + e.message; })
+            .then(function () { btn.disabled = false; });
+    });
 
     // Passenger-facing short name: drop the locality (sub) and leading
     // filler words, so "Opposite Market Place / Burton upon Trent"
@@ -514,6 +562,7 @@
     fetch("/api/audio").then(function (r) { return r.json(); }).then(function (files) {
         $("ns-audiolist").innerHTML = files.length ? ("Drop MP3s in <code>audio/</code>:<br>" + files.map(function (f) { return "<code>" + f.path + "</code>"; }).join("<br>")) : "No premade audio yet — drop MP3s in <code>audio/</code>.";
     }).catch(function () { $("ns-audiolist").textContent = "Audio list unavailable."; });
+    refreshPiper();
 
     fetch("/api/programs").then(function (r) { return r.json(); }).then(function (names) {
         if (!names.length) { fill(progEl, [], "No programs"); return; }

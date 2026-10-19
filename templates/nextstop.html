@@ -101,8 +101,14 @@
             <h2>Premade / AI audio</h2>
             <p class="muted small">Per-stop <code>audio_next</code> / <code>audio_here</code> paths
             (under <code>audio/</code>) play instead of browser TTS — drop in pre-made MP3s now;
-            a local-AI voice can fill the same hook later via <code>POST /api/tts</code>.</p>
-            <label class="check-row"><input type="checkbox" id="ns-localai"> Try local AI TTS first (falls back to browser)</label>
+            a local-AI voice (Piper, like the Bus Audio Studio repo) fills the same hook.</p>
+            <label class="check-row"><input type="checkbox" id="ns-localai"> Local AI TTS (Piper) first, browser fallback</label>
+            <label for="ns-piper-voice">Piper voice</label>
+            <div class="ns-row">
+                <select id="ns-piper-voice"><option value="">Loading…</option></select>
+                <button id="ns-pregen" class="tbtn" type="button" title="Synthesise every stop line for this service now, so GPS triggers play instantly">Pre-bake service</button>
+            </div>
+            <p class="muted small" id="ns-piperstate">Checking Piper…</p>
             <div id="ns-audiolist" class="muted small">Loading audio…</div>
         </section>
     </div>

@@ -162,8 +162,17 @@ the destination to the LED board, which keeps looping it as normal.
   and *arrival* ("…") inside `radius_m` metres, advancing the timeline.
 * **TTS:** browser speechSynthesis by default (voice + rate pickers).
   Per-stop `audio_next` / `audio_here` paths under `audio/` play a
-  premade file instead — the hook pre-made MP3s and a future local-AI
-  voice (`POST /api/tts`) share.
+  premade file instead — the hook pre-made MP3s and the local-AI voice share.
+* **Local AI (Piper, like the Bus Audio Studio repo):** copy the
+  `.onnx` + `.onnx.json` + `custom_words.json` + `directed_replaces.json`
+  into `voices/` (see `voices/README.md`) and install the engine where
+  announcements run (`sudo apt install espeak-ng`, `pip install
+  piper-tts`). Then tick *Local AI TTS* on the page: lines are
+  synthesised server-side and cached under `audio/tts/` with the same
+  name cleaning + `[[phoneme]]` fixes as the Studio. **Pre-bake
+  service** synthesises every stop line up front so GPS triggers play
+  instantly; without engine/voices the page says what is missing and
+  stays on browser TTS.
 * **Files:** `services/*.service` hold the stops + GPS points. Each
   `.dest` destination points at one via `"nextstop_service": "<name>"`
   — set it from the page (pick file → Link), which saves back into the

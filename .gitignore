@@ -3,6 +3,9 @@ __pycache__/
 *.pyc
 .env
 board_state.json
+# Generated Piper TTS clips (audio/tts/cache/...) - rebaked per voice,
+# never committed. Premade MP3s directly under audio/ ARE committed.
+audio/tts/
 # Live program files are machine-local (created/edited via the portal),
 # never committed.
 programs/*.dest

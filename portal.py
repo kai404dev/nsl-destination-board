@@ -31,8 +31,11 @@ Routes:
     /api/nextstop/link                -> POST {program,service,destination,
                                        nextstop_service} ("" to unlink)
     /api/audio                        -> GET list of premade announcement files
-    /api/tts                          -> POST {text} (local-AI hook, 501 until
-                                       configured - browser TTS is used)
+    /api/tts/voices                  -> GET Piper voices + engine status
+    /api/tts                           -> POST {text,voice?} live synthesis
+                                       (cached WAV, 4xx/5xx = use browser TTS)
+    /api/tts/generate                  -> POST {service,voice?} pre-bake a
+                                       service's announcement lines
     /audio/<path>                     -> raw announcement audio files
     /fonts/<path>                     -> raw BDF font files (canvas preview)
 """
@@ -243,6 +246,12 @@ class BoardHandler(SimpleHTTPRequestHandler):
             return self._serve_json(api.list_audio_files(ROOT))
         if url_path in ("/api/nextstop/services", "/api/nextstop/services/"):
             return self._serve_json(api.list_nextstop_services(ROOT))
+        # Local-AI TTS voices (Piper): availability + .onnx list.
+        if url_path in ("/api/tts/voices", "/api/tts/voices/"):
+            words, _ = api.load_tts_words(ROOT)
+            return self._serve_json({"piper": api.piper_available(),
+                                     "voices": api.list_tts_voices(ROOT),
+                                     "custom_words": len(words)})
         if url_path.startswith("/api/nextstop/services/"):
             name = urllib.parse.unquote(
                 url_path[len("/api/nextstop/services/"):].strip("/"))
@@ -440,13 +449,39 @@ class BoardHandler(SimpleHTTPRequestHandler):
                 return self._serve_json({"error": message}, status=400)
             return self._serve_json({"ok": True})
 
-        # Local-AI TTS hook (not configured yet): POST {"text": "..."}.
-        # Always falls back to browser TTS / premade audio for now. A future
-        # provider can implement this route to return {"audio": "/audio/x.mp3"}.
+        # Pre-bake every announcement line for a service: POST
+        # {"service": "<name>", "voice"?}. Warms the live cache below so
+        # GPS-triggered lines play instantly IRL.
+        if url_path in ("/api/tts/generate", "/api/tts/generate/"):
+            data, error = self._read_json_body()
+            if error:
+                return self._serve_json({"error": error}, status=400)
+            if not isinstance(data, dict):
+                return self._serve_json({"error": "body must be JSON"}, status=400)
+            ok, result = api.pregen_service_tts(
+                ROOT, str(data.get("service") or ""),
+                str(data.get("voice") or "") or None)
+            if not ok:
+                return self._serve_json(
+                    {"error": result.get("error", "failed")}, status=400)
+            return self._serve_json({"ok": True, **result})
+
+        # Live local-AI TTS (Piper): POST {"text": "...", "voice"?}.
+        # Synthesises once, then serves the cached WAV. The next-stop page
+        # calls this when "local AI TTS" is ticked and falls back to
+        # browser TTS on any error - so 4xx here just means fallback.
         if url_path in ("/api/tts", "/api/tts/"):
-            return self._serve_json(
-                {"error": "local AI TTS not configured - using browser TTS"},
-                status=501)
+            data, error = self._read_json_body()
+            if error:
+                return self._serve_json({"error": error}, status=400)
+            if not isinstance(data, dict):
+                return self._serve_json({"error": "body must be JSON"}, status=400)
+            ok, result = api.synthesize_tts(
+                ROOT, str(data.get("text") or ""),
+                str(data.get("voice") or "") or None)
+            if not ok:
+                return self._serve_json({"error": result}, status=503)
+            return self._serve_json({"ok": True, "audio": "/" + result})
         # Upload a bitmap: POST {filename, data (base64 or data-URL)}.
         if url_path in ("/api/bitmaps", "/api/bitmaps/"):
             data, error = self._read_json_body()

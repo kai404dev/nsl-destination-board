@@ -1394,7 +1394,8 @@ def set_destination_nextstop(programs_dir: Path, program_name: str,
 
 
 def list_audio_files(root: Path) -> list[dict]:
-    """Return sorted [{path, bytes}] for every playable file under audio/."""
+    """Return sorted [{path, bytes}] for every playable file under audio/.
+    Generated Piper clips live under audio/tts/ (git-ignored cache)."""
     from pathlib import Path as _P
 
     base = _P(root) / AUDIO_DIR_NAME
@@ -1431,6 +1432,231 @@ def _resolve_audio_rel(root: Path, rel: str) -> Path | None:
     except (OSError, ValueError):
         return None
     return resolved
+
+
+# ---------------------------------------------------------------------------
+# Local AI TTS (Piper) - modelled on the standalone Piper "Bus Audio
+# Studio" repo (piper CLI + voices/*.onnx + custom_words.json).
+#
+# Two uses, both cached as WAVs under audio/tts/ (git-ignored):
+#
+# * Live: POST /api/tts {text} synthesises one line on demand and caches
+#   it as audio/tts/cache/<voicestem>/<sha1>.wav. The next-stop page calls
+#   this when "local AI TTS" is ticked, falling back to browser TTS.
+# * Batch: POST /api/tts/generate {service} pre-bakes every stop's
+#   approach + arrival lines so IRL playback is instant (no synth delay
+#   at the GPS trigger).
+#
+# Text prep mirrors Piper: short_stop_name() matches the page's JS
+# shortName() (drop locality + leading opposite/adjacent to/near), then
+# clean_tts_text() applies Piper's clean_stop_name ops (parens, opp/adj,
+# PH->pub etc.), directed_replaces, [[phoneme]] injection from
+# voices/custom_words.json and letter-number separation ("B6" -> "B 6").
+# ---------------------------------------------------------------------------
+
+TTS_VOICES_DIR_NAME = "voices"
+TTS_CACHE_SUBDIR = "tts/cache"
+TTS_MAX_CHARS = 500
+TTS_TIMEOUT_SECONDS = 120
+
+
+def _tts_voices_dir(root: Path) -> Path:
+    from pathlib import Path as _P
+
+    return _P(root) / TTS_VOICES_DIR_NAME
+
+
+def piper_available() -> bool:
+    import shutil as _shutil
+
+    return _shutil.which("piper") is not None
+
+
+def list_tts_voices(root: Path) -> list[str]:
+    """Return sorted .onnx voice filenames in voices/ (copied from Piper)."""
+    try:
+        return sorted(p.name for p in _tts_voices_dir(root).glob("*.onnx")
+                      if p.is_file())
+    except OSError:
+        return []
+
+
+def load_tts_words(root: Path) -> tuple[dict, dict]:
+    """Return (custom_words {lower: phonemes}, directed_replaces).
+
+    custom_words.json maps tricky words to espeak-ng IPA, injected as
+    [[phonemes]] (Piper preprocess.py). directed_replaces.json maps plain
+    substrings (e.g. "Xpress" -> "express"). Missing files mean ( {}, {}).
+    """
+    import json as _json
+
+    words: dict = {}
+    replaces: dict = {}
+    try:
+        raw = _json.loads((_tts_voices_dir(root) / "custom_words.json")
+                          .read_text(encoding="utf-8"))
+        if isinstance(raw, dict):
+            words = {str(k).lower(): str(v) for k, v in raw.items()}
+    except (OSError, ValueError):
+        pass
+    try:
+        raw = _json.loads((_tts_voices_dir(root) / "directed_replaces.json")
+                          .read_text(encoding="utf-8"))
+        if isinstance(raw, dict):
+            replaces = {str(k): str(v) for k, v in raw.items()}
+    except (OSError, ValueError):
+        pass
+    return words, replaces
+
+
+def short_stop_name(name: str) -> str:
+    """Passenger short name. Mirrors the page's JS shortName() exactly.
+
+    Drops leading filler ("Opposite X" -> "X"). The locality is already
+    split out of service stop names, so it never reaches the voice.
+    """
+    n = re.sub(r"\s+", " ", str(name or "")).strip()
+    n = re.sub(r"^(opposite|adjacent to|near|outside|opposite to)\s+",
+               "", n, flags=re.IGNORECASE)
+    return n or re.sub(r"\s+", " ", str(name or "")).strip()
+
+
+def clean_tts_text(text: str, words: dict, replaces: dict) -> str:
+    """Prep one line for Piper (port of Piper's clean + preprocess).
+
+    Parens content and opp/adj filler go, abbreviations expand
+    (PH->pub, Stn->Station, Ctr->Center, mids->Midlands), then directed
+    replaces, [[phoneme]] injection and letter-number separation.
+    """
+    t = str(text or "")
+    for key, value in (replaces or {}).items():
+        if key and key in t:
+            t = t.replace(key, value)
+    t = re.sub(r"\(.*?\)", "", t)
+    t = re.sub(r"opposite", "", t, flags=re.IGNORECASE)
+    t = re.sub(r"\bopp\b", "", t, flags=re.IGNORECASE)
+    t = re.sub(r"adjacent to", "", t, flags=re.IGNORECASE)
+    t = re.sub(r"\badj\b", "", t, flags=re.IGNORECASE)
+    t = re.sub(r"\bPH\b", "pub", t)
+    t = re.sub(r"\bStn\b", "Station", t)
+    t = re.sub(r"\bCtr\b", "Center", t)
+    t = re.sub(r"mids", "Midlands", t, flags=re.IGNORECASE)
+    for word, phonemes in (words or {}).items():
+        t = re.sub(re.escape(word), f"[[{phonemes}]]", t,
+                   flags=re.IGNORECASE)
+    t = re.sub(r"([A-Za-z])(\d)", r"\1 \2", t)
+    return re.sub(r"\s+", " ", t).strip()
+
+
+def _tts_cache_rel(voice: str, clean: str) -> str:
+    import hashlib as _hashlib
+
+    stem = re.sub(r"\.onnx$", "", voice or "default")
+    stem = re.sub(r"[^A-Za-z0-9_-]", "_", stem) or "default"
+    h = _hashlib.sha1(f"{voice}\x00{clean}".encode()).hexdigest()[:16]
+    return f"{AUDIO_DIR_NAME}/{TTS_CACHE_SUBDIR}/{stem}/{h}.wav"
+
+
+def synthesize_tts(root: Path, text: str,
+                    voice: str | None = None) -> tuple[bool, str]:
+    """Synthesise *text* with Piper, cached. Returns (ok, rel-or-error).
+
+    The returned rel path (audio/tts/cache/...) plays via /audio/<path>.
+    Cache hits never touch the engine, so repeats are instant.
+    """
+    import subprocess as _subprocess
+
+    from pathlib import Path as _P
+
+    t = str(text or "").strip()
+    if not t:
+        return False, "empty text"
+    if len(t) > TTS_MAX_CHARS:
+        return False, f"text too long (max {TTS_MAX_CHARS} chars)"
+    voices = list_tts_voices(_P(root))
+    if not voices:
+        return False, "no .onnx voices in voices/ (copy them from the Piper repo)"
+    v = voice or voices[0]
+    if v not in voices:
+        return False, "voice not found"
+    if not piper_available():
+        return False, "piper not installed (pip install piper-tts + espeak-ng)"
+    words, replaces = load_tts_words(_P(root))
+    clean = clean_tts_text(t, words, replaces)
+    if not clean:
+        return False, "nothing left to speak after cleaning"
+    rel = _tts_cache_rel(v, clean)
+    out = _P(root) / rel
+    if out.is_file():
+        return True, rel
+    voice_path = _tts_voices_dir(_P(root)) / v
+    try:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        tmp = out.with_suffix(".wav.tmp")
+        proc = _subprocess.run(
+            ["piper", "-m", str(voice_path), "-f", str(tmp)],
+            input=clean.encode(), capture_output=True,
+            timeout=TTS_TIMEOUT_SECONDS)
+    except _subprocess.TimeoutExpired:
+        return False, "piper timed out"
+    except OSError as exc:
+        return False, f"cannot run piper: {exc}"
+    if proc.returncode != 0 or not tmp.is_file():
+        err = (proc.stderr or b"").decode(errors="replace")[-200:].strip()
+        return False, f"piper failed: {err or proc.returncode}"
+    try:
+        tmp.replace(out)
+    except OSError as exc:
+        return False, f"cannot write clip: {exc}"
+    return True, rel
+
+
+def pregen_service_tts(root: Path, service_name: str,
+                        voice: str | None = None) -> tuple[bool, dict]:
+    """Pre-bake every announcement line for a .service file.
+
+    Synthesises each stop's approach ("Next stop, <short>") and arrival
+    ("<short>") lines so the page's live /api/tts calls hit cache IRL.
+    Returns (ok, {voice, total, generated, cached, texts} | error).
+    """
+    from pathlib import Path as _P
+
+    svc = load_nextstop_service(_P(root), service_name or "")
+    if svc is None:
+        return False, {"error": "next-stop service not found"}
+    texts: list[str] = []
+    for stop in svc.get("stops") or []:
+        short = short_stop_name((stop or {}).get("name", ""))
+        if not short:
+            continue
+        for line in (f"Next stop, {short}", short):
+            if line not in texts:
+                texts.append(line)
+    if not texts:
+        return False, {"error": "service has no speakable stops"}
+    voices = list_tts_voices(_P(root))
+    if not voices:
+        return False, {"error": "no .onnx voices in voices/ (copy them from the Piper repo)"}
+    v = voice or voices[0]
+    if v not in voices:
+        return False, {"error": "voice not found"}
+    if not piper_available():
+        return False, {"error": "piper not installed (pip install piper-tts + espeak-ng)"}
+    words, replaces = load_tts_words(_P(root))
+    generated = cached = 0
+    for line in texts:
+        rel = _tts_cache_rel(v, clean_tts_text(line, words, replaces))
+        hit = (_P(root) / rel).is_file()
+        ok, msg = synthesize_tts(_P(root), line, v)
+        if not ok:
+            return False, {"error": msg, "voice": v, "total": len(texts),
+                            "generated": generated, "cached": cached}
+        if hit:
+            cached += 1
+        else:
+            generated += 1
+    return True, {"voice": v, "total": len(texts),
+                  "generated": generated, "cached": cached, "texts": texts}
 
 
 def sanitise_page_images(images) -> list[dict]:
