@@ -339,11 +339,14 @@
             S.announcedHere[key] = true;
             if (manual) S.awaitPreview = true; // Next press previews what's next
             speakItems(arrivalItems(i), true);
-            // Backstop: jumping straight to the final stop (test click, GPS)
-            // without previewing still flips the board. Re-selecting the
-            // same triple is a no-op for the player, so a preview-first
-            // switch followed by this one is harmless.
-            if (i === S.stops.length - 1) switchToTerminating();
+            // Backstop only: jumping straight to the final stop (test click,
+            // GPS fix inside the arrival ring) with no preview played still
+            // flips the board. In normal flow the preview already switched,
+            // so arrivals never double-switch.
+            if (i === S.stops.length - 1) {
+                var nkey = i + ":" + S.stops[i].name;
+                if (!S.announcedNext[nkey]) switchToTerminating();
+            }
             footerEl.textContent = (manual ? "Testing stop " : "Arrived: ") + S.stops[i].name + (S.stops[i].sub ? " — " + S.stops[i].sub : "") + (i === S.stops.length - 1 ? " (last stop)." : ".");
         }
     }
