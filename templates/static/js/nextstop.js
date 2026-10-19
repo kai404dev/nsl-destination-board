@@ -15,6 +15,7 @@
     var progCache = {};
     var S = { stops: [], idx: -1, running: false, announcedHere: {}, announcedNext: {} };
     var watchId = null, lastPos = null;
+    var NS_WINDOW = 3; // display shows current stop + next two only
 
     /* ---------- clocks ---------- */
     function tick() {
@@ -57,6 +58,7 @@
        Announcements are serialised with a short gap after interrupting,
        so a chopped utterance never pops/clicks into the next one. */
     var speakTimer = null, currentAudio = null;
+    var voiceActive = false, lastVoiceEnd = 0; // our own speech state
     function stopAudio() {
         if (speakTimer) { clearTimeout(speakTimer); speakTimer = null; }
         if (currentAudio) {
@@ -68,17 +70,32 @@
         try { return speechSynthesis.speaking || speechSynthesis.pending; }
         catch (e) { return false; }
     }
+    // True when speech is genuinely still in flight (see browserSpeak).
+    function chopIfBusy() {
+        var recentEnd = false;
+        try { recentEnd = Date.now() - lastVoiceEnd < 300; } catch (e) { }
+        var busy = (voiceActive || engineBusy()) && !(recentEnd && !voiceActive);
+        if (busy) { try { speechSynthesis.cancel(); voiceActive = false; } catch (e) { } }
+        return busy;
+    }
     function browserSpeak(text) {
         if (!$("ns-tts").checked || !text) return;
         try {
             stopAudio();
-            var wasBusy = engineBusy();
-            if (wasBusy) { try { speechSynthesis.cancel(); } catch (e) { } }
+            var wasBusy = chopIfBusy();
+            // Terminal punctuation lets the voice decay instead of cutting
+            // off hard at the last word (another end-of-speech click source).
+            if (!/[.!?…:;]$/.test(text)) text += ".";
             var u = new SpeechSynthesisUtterance(text);
             var v = $("ns-voice").value;
             if (v) { var vs = speechSynthesis.getVoices().filter(function (x) { return x.name === v; }); if (vs[0]) u.voice = vs[0]; }
             u.rate = parseFloat($("ns-rate").value) || 1;
             u.pitch = 1;
+            u.volume = 1;
+            u.onstart = function () { voiceActive = true; };
+            var done = function () { voiceActive = false; lastVoiceEnd = Date.now(); };
+            u.onend = done;
+            u.onerror = done;
             var go = function () { speakTimer = null; try { speechSynthesis.speak(u); } catch (e) { console.warn(e); } };
             // Gap after chopping the previous utterance: speaking into the
             // same tick as cancel() is what produces the click/pop.
@@ -90,7 +107,7 @@
         path = (path || "").trim();
         if (!path) { browserSpeak(fallbackText); return; }
         stopAudio();
-        if (engineBusy()) { try { speechSynthesis.cancel(); } catch (e) { } }
+        chopIfBusy();
         try {
             var a = new Audio(path);
             currentAudio = a;
@@ -114,8 +131,17 @@
         }
         browserSpeak(text);
     }
-    function nextText(s) { return s.announce_next || ("Next stop, " + s.name + (s.sub ? ", " + s.sub : "")); }
-    function hereText(s) { return s.announce_here || (s.name + (s.sub ? ", " + s.sub : "")); }
+    function nextText(s) { return s.announce_next || ("Next stop, " + shortName(s)); }
+    function hereText(s) { return s.announce_here || shortName(s); }
+
+    // Passenger-facing short name: drop the locality (sub) and leading
+    // filler words, so "Opposite Market Place / Burton upon Trent"
+    // announces as just "Market Place".
+    function shortName(s) {
+        var n = ((s && s.name) || "").trim().replace(/\s+/g, " ");
+        n = n.replace(/^(opposite|adjacent to|near|outside|opposite to)\s+/i, "");
+        return n || ((s && s.name) || "").trim();
+    }
 
     function loadVoices() {
         try {
@@ -137,7 +163,11 @@
             footerEl.textContent = "No stops in this service file — add some below.";
             return;
         }
+        // Only the current stop + next two are shown; the window slides
+        // as the route advances (clamped so the last stops still fill it).
+        var start = S.idx < 0 ? 0 : Math.min(S.idx, Math.max(0, S.stops.length - NS_WINDOW));
         S.stops.forEach(function (s, i) {
+            if (i < start || i >= start + NS_WINDOW) return; // 3-stop window
             var li = document.createElement("li");
             li.className = i < S.idx ? "done" : (i === S.idx ? "current" : "todo");
             var rail = document.createElement("div"); rail.className = "rail";
@@ -264,13 +294,16 @@
     function setFsLabel() {
         var b = $("ns-fs");
         if (b) b.textContent = fsActive() ? "⛶ Exit" : "⛶ Full";
+        if (displayEl) displayEl.classList.toggle("fs", fsActive());
     }
     function toggleFs() {
         if (fsActive()) {
+            if (displayEl) displayEl.classList.remove("fs");
             if (document.exitFullscreen) document.exitFullscreen().catch(function () { });
             else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
         } else if (displayEl) {
-            if (displayEl.requestFullscreen) displayEl.requestFullscreen().catch(function (e) { sayStatus("Fullscreen blocked: " + e.message); });
+            displayEl.classList.add("fs"); // fullscreenchange confirms it
+            if (displayEl.requestFullscreen) displayEl.requestFullscreen().catch(function (e) { displayEl.classList.remove("fs"); sayStatus("Fullscreen blocked: " + e.message); });
             else if (displayEl.webkitRequestFullscreen) displayEl.webkitRequestFullscreen();
         }
     }
@@ -306,7 +339,8 @@
         S.running = false; render(S.routeNum, S.destLabel);
         footerEl.textContent = "Route stopped.";
         stopAudio();
-        if (engineBusy()) { try { speechSynthesis.cancel(); } catch (e) { } }
+        voiceActive = false; // abandon the tail, not mid-word: no chop click
+        try { speechSynthesis.cancel(); } catch (e) { }
     });
     $("ns-next").addEventListener("click", function () {
         if (!S.stops.length) return;

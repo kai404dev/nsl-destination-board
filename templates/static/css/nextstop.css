@@ -49,78 +49,76 @@
     cursor: pointer;
 }
 
-/* Fullscreen: fill the screen, scale type up for cabin viewing. */
-.ns-display:fullscreen,
-.ns-display:-webkit-full-screen {
+/* Fullscreen display mode. JS toggles .fs on fullscreenchange (class-based
+   so it cannot miss like the :fullscreen pseudo-class did). The 3-stop
+   list stretches across the full height for cabin viewing. */
+.ns-display::backdrop { background: #0b4b5c; }
+
+.ns-display.fs {
     border: none;
     border-radius: 0;
     width: 100%;
     height: 100%;
     display: flex;
     flex-direction: column;
-    justify-content: center;
 }
 
-.ns-display:fullscreen .ns-fsexit,
-.ns-display:-webkit-full-screen .ns-fsexit { display: block; }
-
-.ns-display:fullscreen .ns-header,
-.ns-display:-webkit-full-screen .ns-header {
-    padding: 2vmin 3vmin;
+.ns-display.fs .ns-fsexit {
+    display: block;
+    top: 2vmin;
+    right: 2vmin;
+    width: 7vmin;
+    height: 7vmin;
+    font-size: 3vmin;
 }
 
-.ns-display:fullscreen .ns-route,
-.ns-display:-webkit-full-screen .ns-route {
-    min-width: 9vmin;
-    height: 9vmin;
-    font-size: 4.5vmin;
+.ns-display.fs .ns-header { padding: 2.5vmin 4vmin; }
+
+.ns-display.fs .ns-route {
+    min-width: 10vmin;
+    height: 10vmin;
+    font-size: 5vmin;
 }
 
-.ns-display:fullscreen .ns-dest,
-.ns-display:-webkit-full-screen .ns-dest { font-size: 4.5vmin; }
+.ns-display.fs .ns-dest { font-size: 5vmin; }
 
-.ns-display:fullscreen .ns-time,
-.ns-display:-webkit-full-screen .ns-time { font-size: 2.4vmin; }
+.ns-display.fs .ns-time { font-size: 2.6vmin; }
 
-.ns-display:fullscreen .ns-time strong,
-.ns-display:-webkit-full-screen .ns-time strong { font-size: 3.6vmin; }
+.ns-display.fs .ns-time strong { font-size: 4vmin; }
 
-.ns-display:fullscreen .ns-stops .sname,
-.ns-display:-webkit-full-screen .ns-stops .sname { font-size: 3.8vmin; }
-
-.ns-display:fullscreen .ns-stops .ssub,
-.ns-display:-webkit-full-screen .ns-stops .ssub { font-size: 2.8vmin; }
-
-.ns-display:fullscreen .ns-stops li,
-.ns-display:-webkit-full-screen .ns-stops li {
-    grid-template-columns: 8vmin minmax(0, 1fr);
-    padding-top: 1.4vmin;
-    padding-bottom: 1.4vmin;
+.ns-display.fs .ns-stops {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-evenly;
+    padding-bottom: 2vmin;
 }
 
-.ns-display:fullscreen .ns-stops .dot,
-.ns-display:-webkit-full-screen .ns-stops .dot {
+.ns-display.fs .ns-stops li { grid-template-columns: 9vmin minmax(0, 1fr); }
+
+.ns-display.fs .ns-stops .sname { font-size: 5vmin; }
+
+.ns-display.fs .ns-stops .ssub { font-size: 3vmin; }
+
+.ns-display.fs .ns-stops .dot {
+    width: 3vmin;
+    height: 3vmin;
+}
+
+.ns-display.fs .ns-stops li.done .dot {
     width: 2.4vmin;
     height: 2.4vmin;
 }
 
-.ns-display:fullscreen .ns-stops li.done .dot,
-.ns-display:-webkit-full-screen .ns-stops li.done .dot {
-    width: 2vmin;
-    height: 2vmin;
+.ns-display.fs .ns-stops li.current .dot {
+    width: 5vmin;
+    height: 5vmin;
+    border-width: 1vmin;
 }
 
-.ns-display:fullscreen .ns-stops li.current .dot,
-.ns-display:-webkit-full-screen .ns-stops li.current .dot {
-    width: 4vmin;
-    height: 4vmin;
-    border-width: 0.8vmin;
-}
-
-.ns-display:fullscreen .ns-footer,
-.ns-display:-webkit-full-screen .ns-footer {
+.ns-display.fs .ns-footer {
     font-size: 2.6vmin;
-    padding: 1.4vmin 3vmin;
+    padding: 1.5vmin 4vmin;
 }
 
 .ns-header {
