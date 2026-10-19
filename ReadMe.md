@@ -188,9 +188,10 @@ the destination to the LED board, which keeps looping it as normal.
   a service announces the same way.
 * **Terminating screen:** below the Link row, point the destination at
   another program/service/destination (e.g. one showing "Bus terminates
-  here"). When the final stop arrives, the board switches to it
-  automatically; starting a new route pushes the new destination as
-  normal. API: `POST /api/nextstop/terminating`.
+  here"). When the final stop is previewed (`next stop, …`) — or arrived
+  at without previewing — the board switches to it automatically;
+  starting a new route pushes the new destination as normal.
+  API: `POST /api/nextstop/terminating`.
 
 ### Live preview from Sign Studio
 

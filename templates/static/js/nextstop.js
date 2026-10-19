@@ -339,6 +339,10 @@
             S.announcedHere[key] = true;
             if (manual) S.awaitPreview = true; // Next press previews what's next
             speakItems(arrivalItems(i), true);
+            // Backstop: jumping straight to the final stop (test click, GPS)
+            // without previewing still flips the board. Re-selecting the
+            // same triple is a no-op for the player, so a preview-first
+            // switch followed by this one is harmless.
             if (i === S.stops.length - 1) switchToTerminating();
             footerEl.textContent = (manual ? "Testing stop " : "Arrived: ") + S.stops[i].name + (S.stops[i].sub ? " — " + S.stops[i].sub : "") + (i === S.stops.length - 1 ? " (last stop)." : ".");
         }
@@ -370,7 +374,15 @@
         var key = i + ":" + st.name;
         if (S.announcedNext[key]) return;
         S.announcedNext[key] = true;
-        speakItems(nextItems(st), true);
+        previewStop(i, true);
+    }
+    // Speak the "next stop" preview for i (no timeline advance). Previewing
+    // the final stop also flips the board to the terminating screen.
+    function previewStop(i, interrupt) {
+        var st = S.stops[i];
+        if (!st) return;
+        speakItems(nextItems(st), interrupt);
+        if (i === S.stops.length - 1) switchToTerminating();
     }
 
     function currentRoute() {
@@ -583,7 +595,7 @@
             // Mark it announced so a later GPS approach doesn't repeat it;
             // Hear next still replays on demand (it bypasses the dedup).
             S.announcedNext[nxt + ":" + S.stops[nxt].name] = true;
-            speakItems(nextItems(S.stops[nxt]), true);
+            previewStop(nxt, true);
             footerEl.textContent = "Next stop: " + S.stops[nxt].name + " — press Next on arrival.";
         } else {
             S.awaitPreview = true;
@@ -596,8 +608,8 @@
         arriveAt(Math.max(0, S.idx - 1), true);
     });
     $("ns-say-next").addEventListener("click", function () {
-        var n = S.stops[Math.min(S.stops.length - 1, S.idx + 1)] || S.stops[0];
-        if (n) speakItems(nextItems(n), true);
+        var ni = Math.min(S.stops.length - 1, S.idx + 1);
+        if (S.stops[ni]) previewStop(ni, true);
     });
     $("ns-say-here").addEventListener("click", function () {
         var i = S.idx >= 0 ? S.idx : 0;
