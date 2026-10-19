@@ -133,6 +133,13 @@
     }
     function nextText(s) { return s.announce_next || ("Next stop, " + shortName(s)); }
     function hereText(s) { return s.announce_here || shortName(s); }
+    function lastText(s) { return s.announce_last || ("This is our last stop, " + shortName(s)); }
+    // Arrival speech for stop i: the final stop gets the last-stop message.
+    function arrivalSpeech(i) {
+        var st = S.stops[i];
+        if (i === S.stops.length - 1) return { text: lastText(st), audio: st.audio_last || st.audio_here };
+        return { text: hereText(st), audio: st.audio_here };
+    }
 
     /* ---------- Piper local-AI TTS (Bus Audio Studio pipeline) ----------
        Voices + engine status from the portal; live lines are synthesised
@@ -224,6 +231,12 @@
             var nm = document.createElement("div"); nm.className = "sname"; nm.textContent = s.name;
             body.appendChild(nm);
             if (s.sub) { var sb = document.createElement("div"); sb.className = "ssub"; sb.textContent = s.sub; body.appendChild(sb); }
+            if (i === S.stops.length - 1) {
+                var lb = document.createElement("div");
+                lb.className = "slast";
+                lb.textContent = i === S.idx ? "★ This is our last stop" : "★ Last stop";
+                body.appendChild(lb);
+            }
             li.appendChild(rail); li.appendChild(body);
             li.title = "Click to jump here (test)";
             li.addEventListener("click", function () { arriveAt(i, true); });
@@ -245,8 +258,9 @@
         if (!S.announcedHere[key]) {
             S.announcedHere[key] = true;
             var st = S.stops[i];
-            speak(hereText(st), st.audio_here);
-            footerEl.textContent = (manual ? "Testing stop " : "Arrived: ") + st.name + (st.sub ? " — " + st.sub : "") + ".";
+            var a = arrivalSpeech(i);
+            speak(a.text, a.audio);
+            footerEl.textContent = (manual ? "Testing stop " : "Arrived: ") + st.name + (st.sub ? " — " + st.sub : "") + (i === S.stops.length - 1 ? " (last stop)." : ".");
         }
     }
 
@@ -406,8 +420,10 @@
         if (n) speak(nextText(n), n.audio_next);
     });
     $("ns-say-here").addEventListener("click", function () {
-        var c = S.stops[S.idx] || S.stops[0];
-        if (c) speak(hereText(c), c.audio_here);
+        var i = S.idx >= 0 ? S.idx : 0;
+        if (!S.stops[i]) return;
+        var a = arrivalSpeech(i);
+        speak(a.text, a.audio);
     });
 
     /* ---------- GPS ---------- */
@@ -456,6 +472,7 @@
 
     /* ---------- service file editor ---------- */
     function stopRow(s, i) {
+        var FIELDS = ["name", "sub", "lat", "lon", "approach_m", "radius_m", "announce_next", "announce_here", "announce_last", "audio_next", "audio_here", "audio_last"];
         var d = document.createElement("div");
         d.className = "ns-stop-card";
         d.innerHTML =
@@ -468,12 +485,14 @@
             '<input type="number" data-k="radius_m" placeholder="arrival m" value="">' +
             '<input type="text" class="full" data-k="announce_next" placeholder="Next-stop announcement (optional)" value="">' +
             '<input type="text" class="full" data-k="announce_here" placeholder="Arrival announcement (optional)" value="">' +
+            '<input type="text" class="full" data-k="announce_last" placeholder="Last-stop message (final stop only)" value="">' +
             '<input type="text" data-k="audio_next" placeholder="audio_next (audio/x.mp3)" value="">' +
             '<input type="text" data-k="audio_here" placeholder="audio_here (audio/x.mp3)" value="">' +
+            '<input type="text" data-k="audio_last" placeholder="audio_last (final stop)" value="">' +
             '</div><div class="ns-row" style="margin-top:.4rem">' +
             '<button class="tbtn" data-act="gps" type="button">Use GPS</button>' +
             '<button class="tbtn" data-act="del" type="button">Remove</button></div>';
-        ["name", "sub", "lat", "lon", "approach_m", "radius_m", "announce_next", "announce_here", "audio_next", "audio_here"].forEach(function (k) {
+        FIELDS.forEach(function (k) {
             var inp = d.querySelector('[data-k="' + k + '"]');
             if (s && s[k] !== undefined && s[k] !== "") inp.value = s[k];
         });
@@ -518,7 +537,9 @@
                 approach_m: parseInt(v("approach_m")) || 250,
                 radius_m: parseInt(v("radius_m")) || 60,
                 announce_next: v("announce_next"), announce_here: v("announce_here"),
-                audio_next: v("audio_next"), audio_here: v("audio_here")
+                announce_last: v("announce_last"),
+                audio_next: v("audio_next"), audio_here: v("audio_here"),
+                audio_last: v("audio_last")
             });
         });
         var body = {

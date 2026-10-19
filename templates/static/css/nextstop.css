@@ -100,6 +100,8 @@
 
 .ns-display.fs .ns-stops .ssub { font-size: 3vmin; }
 
+.ns-display.fs .ns-stops .slast { font-size: 3vmin; }
+
 .ns-display.fs .ns-stops .dot {
     width: 3vmin;
     height: 3vmin;
@@ -223,6 +225,7 @@
 
 .ns-stops .sname { font-weight: 600; font-size: 0.98rem; }
 .ns-stops .ssub { font-size: 0.8rem; color: #d6edf2; }
+.ns-stops .slast { font-size: 0.8rem; font-weight: 700; color: #ffe14d; }
 .ns-stops li.current .sname { color: #ffe14d; }
 
 .ns-footer {

@@ -1259,8 +1259,10 @@ def _clean_service_stop(raw) -> dict | None:
         "approach_m": _radius(raw.get("approach_m", raw.get("approach_radius_m", 250)), 250),
         "announce_next": _text(raw.get("announce_next")),
         "announce_here": _text(raw.get("announce_here")),
+        "announce_last": _text(raw.get("announce_last")),
         "audio_next": _audio(raw.get("audio_next")),
         "audio_here": _audio(raw.get("audio_here")),
+        "audio_last": _audio(raw.get("audio_last")),
     }
 
 
@@ -1466,10 +1468,36 @@ def _tts_voices_dir(root: Path) -> Path:
     return _P(root) / TTS_VOICES_DIR_NAME
 
 
-def piper_available() -> bool:
-    import shutil as _shutil
+def _piper_cmd() -> list[str] | None:
+    """Argv to run Piper: PATH binary, venv-local binary, or -m fallback.
 
-    return _shutil.which("piper") is not None
+    pip installs piper-tts into the venv (``.venv/bin/piper``), which the
+    systemd service never has on PATH - so PATH alone is not enough.
+    """
+    import shutil as _shutil
+    import sys as _sys
+    from pathlib import Path as _P
+
+    found = _shutil.which("piper")
+    if found:
+        return [found]
+    local = _P(_sys.executable).parent / "piper"
+    try:
+        if local.is_file():
+            return [str(local)]
+    except OSError:
+        pass
+    try:
+        import importlib.util as _ilu
+        if _ilu.find_spec("piper") is not None:
+            return [_sys.executable, "-m", "piper"]
+    except (ImportError, ValueError):
+        pass
+    return None
+
+
+def piper_available() -> bool:
+    return _piper_cmd() is not None
 
 
 def list_tts_voices(root: Path) -> list[str]:
@@ -1580,7 +1608,7 @@ def synthesize_tts(root: Path, text: str,
     if v not in voices:
         return False, "voice not found"
     if not piper_available():
-        return False, "piper not installed (pip install piper-tts + espeak-ng)"
+        return False, "piper not found (pip install piper-tts in the venv)"
     words, replaces = load_tts_words(_P(root))
     clean = clean_tts_text(t, words, replaces)
     if not clean:
@@ -1589,12 +1617,15 @@ def synthesize_tts(root: Path, text: str,
     out = _P(root) / rel
     if out.is_file():
         return True, rel
+    cmd = _piper_cmd()
+    if cmd is None:
+        return False, "piper not found (pip install piper-tts in the venv)"
     voice_path = _tts_voices_dir(_P(root)) / v
     try:
         out.parent.mkdir(parents=True, exist_ok=True)
         tmp = out.with_suffix(".wav.tmp")
         proc = _subprocess.run(
-            ["piper", "-m", str(voice_path), "-f", str(tmp)],
+            cmd + ["-m", str(voice_path), "-f", str(tmp)],
             input=clean.encode(), capture_output=True,
             timeout=TTS_TIMEOUT_SECONDS)
     except _subprocess.TimeoutExpired:
@@ -1625,11 +1656,18 @@ def pregen_service_tts(root: Path, service_name: str,
     if svc is None:
         return False, {"error": "next-stop service not found"}
     texts: list[str] = []
-    for stop in svc.get("stops") or []:
+    last_idx = len(svc.get("stops") or []) - 1
+    for n, stop in enumerate(svc.get("stops") or []):
         short = short_stop_name((stop or {}).get("name", ""))
         if not short:
             continue
-        for line in (f"Next stop, {short}", short):
+        lines = [f"Next stop, {short}"]
+        if n == last_idx:
+            lines.append((stop or {}).get("announce_last")
+                         or f"This is our last stop, {short}")
+        else:
+            lines.append(short)
+        for line in lines:
             if line not in texts:
                 texts.append(line)
     if not texts:
@@ -1641,7 +1679,7 @@ def pregen_service_tts(root: Path, service_name: str,
     if v not in voices:
         return False, {"error": "voice not found"}
     if not piper_available():
-        return False, {"error": "piper not installed (pip install piper-tts + espeak-ng)"}
+        return False, {"error": "piper not found (pip install piper-tts in the venv)"}
     words, replaces = load_tts_words(_P(root))
     generated = cached = 0
     for line in texts:
